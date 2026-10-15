@@ -4,7 +4,7 @@
 
 ## 실행
 
-Node.js 22 권장.
+Node.js 22 최신 LTS 또는 24 권장.
 
 ```sh
 npm ci
@@ -30,9 +30,11 @@ npm run preview
 
 ## GitHub Pages 배포
 
-실제 저장소 생성과 배포는 수행하지 않았습니다. 워크플로는 수동 실행만 허용합니다.
+저장소: https://github.com/meibinlee/python-coding-pet
 
-1. 승인 후 원하는 GitHub 저장소를 만들고 코드를 push합니다.
+워크플로는 수동 실행만 허용합니다. 비공개 저장소의 Pages 지원 여부는 GitHub 요금제에 따라 다릅니다. 현재 요금제에서는 비공개 저장소 배포 요청이 HTTP 422로 거절되어, 공개 전환 승인 또는 지원 요금제가 필요합니다.
+
+1. 위 저장소에 최신 코드를 push합니다.
 2. Settings → Pages → Build and deployment에서 **GitHub Actions**를 선택합니다.
 3. 기본 `base`는 `./`라서 프로젝트 하위 경로의 스크립트·SVG를 상대 경로로 로드합니다. 명시적인 경로를 원하면 Settings → Secrets and variables → Actions → Variables에 `VITE_BASE_PATH`를 `/저장소이름/`으로 설정합니다. 사용자 최상위 `<username>.github.io` 저장소는 `/`입니다.
 4. Actions → Deploy to GitHub Pages → Run workflow를 수동 실행합니다. `npm ci`, 테스트, 빌드를 거쳐 `dist`가 배포됩니다.
@@ -41,9 +43,9 @@ npm run preview
 로컬에서 프로젝트 경로 빌드 확인:
 
 ```sh
-VITE_BASE_PATH=/coding-pet/ npm run build
+VITE_BASE_PATH=/python-coding-pet/ npm run build
 npm run preview
-# http://127.0.0.1:4173/coding-pet/ 접속
+# http://127.0.0.1:4173/python-coding-pet/ 접속
 ```
 
 ## 데이터 저장 한계
@@ -52,8 +54,9 @@ npm run preview
 
 클라이언트 데이터는 개발자 도구로 변경할 수 있으므로 교육용 개인 플레이에 적합합니다.
 
-## 현재 환경의 검증 기록
+## 검증 기록
 
-의존성 설치 시 `registry.npmjs.org` DNS 조회가 `ENOTFOUND`로 실패했습니다. `npm run test`와 `npm run build`는 실행을 시도했으나 각각 Vitest/Vite 미설치로 완료하지 못했습니다. Node 기본 assertion으로 별도 수행한 3,000개 문제 생성, 1,000회 출제 선택, 보상 잠금·레벨 경계·저장 복구 검사는 통과했습니다. Vitest 테스트 파일도 Node assertion 어댑터로 실행해 검증했지만, 이는 실제 Vitest 실행이나 Vite 빌드 및 브라우저 검증을 대신하지 않습니다.
-
-네트워크가 가능한 환경에서 `npm install`로 `package-lock.json`을 생성하고 커밋한 뒤 `npm run test`, `npm run build`를 실행해야 합니다. GitHub Actions의 `npm ci`도 이 잠금 파일이 있어야 동작합니다. 실제 브라우저와 배포 주소에서의 최종 검증은 아직 수행하지 못했습니다.
+- Vitest 자동 테스트: 39개 통과 (템플릿별 100회, 총 3,000회 생성 포함).
+- `npm run build`: 정적 프로덕션 빌드 통과.
+- 테스트 도구를 Vitest 5.0.4로 업데이트하고 잠금 파일을 생성했습니다. 설치 시 npm audit 기준 취약점 0개입니다.
+- 실제 브라우저의 모바일·키보드 동작과 배포 URL 검증은 별도 확인이 필요합니다.
