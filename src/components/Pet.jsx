@@ -1,0 +1,1 @@
+export default function Pet({pet,stage}) {return <div className="pet-scene"><span className="spark s1">✧</span><span className="spark s2">✦</span><div className="bubble">함께 코딩할래?</div><img className="pet" src={`${import.meta.env.BASE_URL}pets/${stage.image}.svg`} alt={`${stage.name} 모습의 ${pet.petName}`} /><div className="ground"/><span className="plant">✿</span></div>;}

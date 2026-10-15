@@ -1,0 +1,1 @@
+export default function StatusBars({pet}) {return <div className="status-bars">{[['hunger','배부름','🍙'],['cleanliness','청결도','🫧'],['affection','애정도','♥']].map(([key,label,icon])=><div className={`status ${key}`} key={key}><div><span>{icon} {label}</span><strong>{pet[key]} <small>/ 100</small></strong></div><progress aria-label={label} max="100" value={pet[key]}/></div>)}</div>;}
