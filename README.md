@@ -32,7 +32,9 @@ npm run preview
 
 저장소: https://github.com/meibinlee/python-coding-pet
 
-워크플로는 수동 실행만 허용합니다. 비공개 저장소의 Pages 지원 여부는 GitHub 요금제에 따라 다릅니다. 현재 요금제에서는 비공개 저장소 배포 요청이 HTTP 422로 거절되어, 공개 전환 승인 또는 지원 요금제가 필요합니다.
+사용자 승인 후 공개 저장소로 전환하고 GitHub Actions 기반 Pages를 설정했습니다. 워크플로는 수동 실행만 허용합니다.
+
+배포 주소: https://meibinlee.github.io/python-coding-pet/
 
 1. 위 저장소에 최신 코드를 push합니다.
 2. Settings → Pages → Build and deployment에서 **GitHub Actions**를 선택합니다.
