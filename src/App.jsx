@@ -13,7 +13,7 @@ import { isOnVacation } from './game/vacation.js';
 import { healthStatus } from './game/health.js';
 import { currentDaily, nextKoreanMidnight } from './game/time.js';
 import { DAILY_LIMIT, submitStored, updateStored, basicCare, setVacation } from './game/daily.js';
-import { SAVE_KEY, loadPet, savePet, resetPet, defaultPet, createPet } from './game/storage.js';
+import { SAVE_KEY, loadPet, savePet, resetPet, defaultPet, createPet, DEFAULT_PET_NAME } from './game/storage.js';
 
 const SAVE_WARNING = '자동 저장에 실패했어요. 이 창을 닫으면 기록이 사라질 수 있어요.';
 const LIMIT_MESSAGE = '오늘의 10문제를 모두 풀었어요. 한국 시간 자정부터 다시 풀 수 있어요.';
@@ -180,7 +180,7 @@ export default function App() {
       const ok = locks?.request ? await locks.request('coding-pet-save', () => resetPet()) : resetPet();
       memoryOnly.current = !ok;
       setStarted(false);
-      setName('코코');
+      setName(DEFAULT_PET_NAME);
       history.current = [];
       clearTimeout(reactionTimer.current);
       setReaction(null);
@@ -198,13 +198,13 @@ export default function App() {
 
   return <div className="app">
     <header>
-      <a href="./" className="brand"><span className="brand-icon">▦</span> 코딩 펫 <span className="brand-sub">작은 도전, 함께 자라는 하루</span></a>
+      <a href="./" className="brand"><img className="brand-icon" src={`${import.meta.env.BASE_URL}favicon.svg`} width="38" height="38" alt="" /> 코딩 펫 <span className="brand-sub">작은 도전, 함께 자라는 하루</span></a>
       <button className="reset" disabled={pending} onClick={reset}>↻ 초기화</button>
     </header>
     <main>
       <div className="intro">
         <span className="eyebrow">MY LITTLE CODING FRIEND</span>
-        <h1>코딩 한 걸음,<br className="mobile-break" /> 성장 한 뼘.</h1>
+        <h1>파이썬 타마고치</h1>
         <p>문제를 풀고, 나만의 작은 친구를 돌봐요.</p>
       </div>
       {!started ? <form className="welcome card" onSubmit={start}>
@@ -297,7 +297,7 @@ export default function App() {
       <div className="learning-note"><span>✎</span><div><strong>매번 새로운 작은 도전</strong><p>6개 영역 · 30가지 문제 패턴으로 텍스트 기반 프로그래밍을 복습해요.</p></div></div>
       {notice && <p role="status" className="notice">{notice}</p>}
     </main>
-    <footer>이 브라우저에 자동 저장돼요 · 계정 없이 즐기는 나만의 코딩 시간<br />사이트 데이터를 지우면 기록도 사라져요. 다른 기기와는 동기화되지 않아요.</footer>
+    <footer>이 브라우저에 자동 저장돼요 · 계정 없이 즐기는 나만의 코딩 시간<br />사이트 데이터를 지우면 기록도 사라져요. 다른 기기와는 동기화되지 않아요.<br /><span className="credit">by.meibinlee</span></footer>
     {state.quiz && <QuizModal quiz={state.quiz} pending={pending} limitReached={daily.count >= DAILY_LIMIT} sleepBlocked={isActionResting(state.pet,state.quiz.action,now)} vacationBlocked={onVacation}
       onAnswer={answer => performUpdate(options => submitStored(state, answer, options))}
       onNext={() => openQuiz(state.quiz.action)} onClose={closeQuiz} />}

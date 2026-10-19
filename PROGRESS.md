@@ -2,10 +2,10 @@
 
 ## 2026-10-19 — 오늘 작업 마무리
 
-오늘의 마지막 기능 커밋은 `44c29c1`이며 main에 푸시하고 GitHub Pages 배포를 완료했다.
+오늘 주요 기능 완료 커밋은 `44c29c1`이며 main에 푸시하고 GitHub Pages 배포를 완료했다.
 
 - 서비스: https://meibinlee.github.io/python-coding-pet/
-- 기능 배포 성공 기록: https://github.com/meibinlee/python-coding-pet/actions/runs/39261729659
+- 주요 기능 배포 성공 기록: https://github.com/meibinlee/python-coding-pet/actions/runs/39261729659
 - 기술 범위: React + Vite + JavaScript + CSS, localStorage, 정적 SPA. 백엔드·DB·인증·외부 API 없음.
 
 ### 완료한 기능
@@ -60,8 +60,15 @@
 ### 다음 작업
 
 1. 실제 브라우저에서 신규 시작·기존 기록 이전·세 캐릭터 선택·모바일·키보드 흐름 확인.
-2. 마지막 계획 항목인 파비콘 교체. 현재는 아직 구현하지 않음.
+2. 새 알 모양 파비콘·브랜드 아이콘의 실제 브라우저 표시 확인.
 3. 필요 시 빠진 상태 이미지 연결. 현재 우사기 성체 및 세 캐릭터 아기의 수면 이미지는 기본 모습과 낮잠 표시로 대체.
 4. 사용자 피드백에 따른 화면·문구 조정. 새로운 기능은 다음 작업 요청부터 진행.
 
 실행·게임 규칙·배포 방법은 README.md, 승인된 기능 사양은 NEXT_DEVELOPMENT_PLAN.md를 함께 참조한다.
+
+### 마무리 추가 요청
+
+- 메인 제목과 브라우저 제목을 `파이썬 타마고치`로 변경.
+- 자체 제작 알 모양 SVG 파비콘을 추가하고 상단 `코딩 펫` 옆 네모 표시도 같은 이미지로 교체.
+- 푸터에 `by.meibinlee` 추가.
+- 새 펫·빈 이름·초기화 시 기본 이름을 `파이썬`으로 변경. 이미 저장된 이름은 보존.

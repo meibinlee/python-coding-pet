@@ -6,10 +6,11 @@ import { isCharacterId } from '../data/characters.js';
 import { newAlbum, normalizeAlbum } from './album.js';
 import { emptyDaily, koreanDate } from './time.js';
 
+export const DEFAULT_PET_NAME = '파이썬';
 export const SAVE_KEY = 'coding-pet-save-v1';
 export const defaultPet = (now = Date.now()) => ({
   schemaVersion: 2,
-  petName: '코코',
+  petName: DEFAULT_PET_NAME,
   characterId: null,
   album: newAlbum(null,now),
   hunger: 70,
@@ -168,5 +169,5 @@ export function resetPet(storage) {
 
 export function createPet(petName, characterId, now = Date.now()) {
   if (!isCharacterId(characterId)) throw new Error('친구를 선택해 주세요.');
-  return { ...defaultPet(now), petName: petName.trim().slice(0,20) || '코코', characterId, album: newAlbum(characterId,now) };
+  return { ...defaultPet(now), petName: petName.trim().slice(0,20) || DEFAULT_PET_NAME, characterId, album: newAlbum(characterId,now) };
 }
