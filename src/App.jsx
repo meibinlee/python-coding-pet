@@ -4,6 +4,7 @@ import StatusBars from './components/StatusBars.jsx';
 import QuizModal from './components/QuizModal.jsx';
 import { nextQuestion } from './game/questions.js';
 import { actions, growth, growthStatus, refreshGrowth } from './game/rules.js';
+import { sleepStatus, isActionResting } from './game/sleep.js';
 import { healthStatus } from './game/health.js';
 import { currentDaily, nextKoreanMidnight } from './game/time.js';
 import { DAILY_LIMIT, submitStored, updateStored, basicCare } from './game/daily.js';
@@ -35,6 +36,7 @@ export default function App() {
   const growthProgress = growthStatus(state.pet, now);
   const remainingTime = formatWait(growthProgress.remainingMs);
   const health = healthStatus(state.pet, now);
+  const nap = sleepStatus(state.pet, now);
   const daily = currentDaily(state.pet, now);
 
   useEffect(() => {
@@ -46,7 +48,8 @@ export default function App() {
       clearTimeout(timer);
       const status = growthStatus(stateRef.current.pet, time);
       const healthTime = healthStatus(stateRef.current.pet, time).nextCheckMs;
-      timer = setTimeout(refresh, Math.min(30000, healthTime > 0 ? healthTime + 1 : 30000, nextKoreanMidnight(time) - time + 1, status.remainingMs > 0 ? status.remainingMs + 1 : 30000));
+      const napTime = sleepStatus(stateRef.current.pet, time).remainingMs;
+      timer = setTimeout(refresh, Math.min(30000, napTime > 0 ? napTime + 1 : 30000, healthTime > 0 ? healthTime + 1 : 30000, nextKoreanMidnight(time) - time + 1, status.remainingMs > 0 ? status.remainingMs + 1 : 30000));
       if (!submitting.current) {
         const snapshot = stateRef.current.pet;
         updateStored(stateRef.current, refreshGrowth, { preferMemory: memoryOnly.current }).then(result => {
@@ -119,6 +122,10 @@ export default function App() {
   function openQuiz(action) {
     const time = Date.now();
     setNow(time);
+    if (isActionResting(state.pet, action, time)) {
+      setNotice('낮잠 중에는 먹이를 잠시 쉬어요. 청소나 놀이를 선택해 주세요.');
+      return;
+    }
     if (currentDaily(state.pet, time).count >= DAILY_LIMIT) {
       setNotice(LIMIT_MESSAGE);
       return;
@@ -186,8 +193,14 @@ export default function App() {
             <progress aria-label="성장 경험치" max={stage.next ? stage.next - stage.start : 1} value={stage.next ? Math.min(stage.next - stage.start, Math.max(0, state.pet.totalXp - stage.start)) : 1} />
           </div>
         </div>
-        <Pet pet={state.pet} stage={stage} sick={health.sick} limitReached={daily.count >= DAILY_LIMIT} />
+        <Pet pet={state.pet} stage={stage} sick={health.sick} sleeping={nap.sleeping} limitReached={daily.count >= DAILY_LIMIT} />
         <div className="pet-caption">{stage.next ? '경험치와 함께한 시간이 모이면 성장해요.' : '멋진 친구로 자랐어요! 계속 함께해요.'}</div>
+        {nap.sleeping && <section className="sleep-details" aria-label="낮잠 상태" role="status">
+          <h3>☾ 배불러서 낮잠 자는 중이에요</h3>
+          <p>약 {formatWait(nap.remainingMs)} 뒤에 깨어나요. 새로고침해도 같은 시간에 일어나요.</p>
+          <p id="sleep-note">먹이는 잠시 쉬고 청소·놀이 문제를 풀어 주세요. 기본 돌봄과 간호도 가능해요.</p>
+          {health.sick && <p>자는 동안에도 간호가 필요해요. 아래 회복 조건을 함께 확인해 주세요.</p>}
+        </section>}
         {stage.level >= 2 && <section className={`health-details${health.sick ? ' is-sick' : ''}`} aria-label="건강과 회복 상태" role="status">
           <h3>{health.sick ? (health.recovering ? '♡ 함께 회복하는 중이에요' : '♡ 조금 아파요. 하루 동안 함께 보살펴 주세요.') : '✓ 편안하게 지내고 있어요'}</h3>
           {health.sick ? <>
@@ -216,9 +229,9 @@ export default function App() {
         </div>
         <div className="actions">
           {Object.entries(actions).map(([action, label], index) => <button
-            key={action} className={action} disabled={pending || daily.count >= DAILY_LIMIT}
+            key={action} className={action} disabled={pending || daily.count >= DAILY_LIMIT || isActionResting(state.pet, action, now)} aria-describedby={isActionResting(state.pet, action, now) ? 'sleep-note' : undefined}
             onClick={event => { trigger.current = event.currentTarget; openQuiz(action); }}
-          ><span>{['🍙', '🧹', '🧸'][index]}</span><strong>{label}</strong><small>정답이면 +15</small></button>)}
+          ><span>{['🍙', '🧹', '🧸'][index]}</span><strong>{label}</strong><small>{isActionResting(state.pet, action, now) ? '낮잠 중 · 잠시 쉬어요' : '정답이면 +15'}</small></button>)}
         </div>
         <div className="care-panel">
           <button onClick={() => performUpdate(options => updateStored(state, basicCare, options), health.sick ? '간호 기록을 남겼어요. 회복 조건을 확인해 주세요.' : '오늘도 곁에서 돌봐 줬어요!')} disabled={pending || !health.canCare}>
@@ -236,7 +249,7 @@ export default function App() {
       {notice && <p role="status" className="notice">{notice}</p>}
     </main>
     <footer>이 브라우저에 자동 저장돼요 · 계정 없이 즐기는 나만의 코딩 시간<br />사이트 데이터를 지우면 기록도 사라져요. 다른 기기와는 동기화되지 않아요.</footer>
-    {state.quiz && <QuizModal quiz={state.quiz} pending={pending} limitReached={daily.count >= DAILY_LIMIT}
+    {state.quiz && <QuizModal quiz={state.quiz} pending={pending} limitReached={daily.count >= DAILY_LIMIT} sleepBlocked={isActionResting(state.pet,state.quiz.action,now)}
       onAnswer={answer => performUpdate(options => submitStored(state, answer, options))}
       onNext={() => openQuiz(state.quiz.action)} onClose={closeQuiz} />}
   </div>;

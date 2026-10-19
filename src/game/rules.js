@@ -1,4 +1,5 @@
 import { isCorrect } from './questions.js';
+import { refreshSleep } from './sleep.js';
 import { refreshHealth } from './health.js';
 import { DAY_MS, koreanDate } from './time.js';
 
@@ -50,7 +51,7 @@ export function advanceGrowth(pet, now = Date.now(), cared = false) {
   } };
 }
 export function refreshGrowth(state, now = Date.now()) {
-  const pet = advanceGrowth(refreshHealth(state.pet, now), now);
+  const pet = advanceGrowth(refreshSleep(refreshHealth(state.pet, now), now), now);
   return pet === state.pet ? state : { ...state, pet };
 }
 export function answerQuiz(state, answer) {

@@ -1,5 +1,6 @@
 import { answerQuiz, advanceGrowth } from './rules.js';
 import { refreshHealth, healthStatus, performCare } from './health.js';
+import { startNap, refreshSleep } from './sleep.js';
 import { currentDaily } from './time.js';
 import { loadPet, savePet } from './storage.js';
 export const DAILY_LIMIT = 10;
@@ -19,13 +20,14 @@ export function submitDaily(state, answer, now = Date.now()) {
       careActions: result.quiz.correct ? [...new Set([...daily.careActions,quiz.action])] : daily.careActions,
     },
   };
-  return {...result,pet:advanceGrowth(refreshHealth(pet,now),now,result.quiz.correct)};
+  const grown = advanceGrowth(refreshHealth(pet,now),now,result.quiz.correct);
+  return {...result,pet:startNap(state.pet,grown,quiz.action,result.quiz.correct,now)};
 }
 
 export function basicCare(state, now = Date.now()) {
   const daily = currentDaily(state.pet, now);
   if (!healthStatus(state.pet,now).canCare) return state;
-  const cared = performCare(state.pet,now);
+  const cared = refreshSleep(performCare(state.pet,now),now);
   return {...state,pet:advanceGrowth({...cared,daily:{...daily,careDone:true,nursingDone:daily.nursingDone||Boolean(refreshHealth(state.pet,now).health.sickSince)}},now,true)};
 }
 
