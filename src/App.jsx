@@ -3,7 +3,7 @@ import Pet from './components/Pet.jsx';
 import StatusBars from './components/StatusBars.jsx';
 import QuizModal from './components/QuizModal.jsx';
 import { nextQuestion } from './game/questions.js';
-import { actions, growth, growthStatus, refreshGrowth } from './game/rules.js';
+import { actions, growth, growthStatus, refreshGrowth, isRoomMessy } from './game/rules.js';
 import { sleepStatus, isActionResting } from './game/sleep.js';
 import { healthStatus } from './game/health.js';
 import { currentDaily, nextKoreanMidnight } from './game/time.js';
@@ -26,6 +26,9 @@ export default function App() {
   const [notice, setNotice] = useState(loaded.error);
   const [now, setNow] = useState(Date.now);
   const [pending, setPending] = useState(false);
+  const [cleaning, setCleaning] = useState(false);
+  const cleaningTimer = useRef(null);
+  const pendingClean = useRef(false);
   const history = useRef([]);
   const trigger = useRef(null);
   const submitting = useRef(false);
@@ -75,6 +78,7 @@ export default function App() {
     window.addEventListener('storage', sync);
     return () => {
       active = false;
+      clearTimeout(cleaningTimer.current);
       clearTimeout(timer);
       window.removeEventListener('focus', refresh);
       document.removeEventListener('visibilitychange', refresh);
@@ -89,6 +93,7 @@ export default function App() {
     try {
       const result = await update({ preferMemory: memoryOnly.current });
       setState(result.state);
+      if (!result.blocked && result.state.quiz?.correct && result.state.quiz.action === 'cleanliness') pendingClean.current = true;
       setNow(Date.now());
       if (!result.saved) {
         memoryOnly.current = true;
@@ -137,6 +142,13 @@ export default function App() {
 
   function closeQuiz() {
     if (submitting.current) return;
+    if (pendingClean.current) {
+      pendingClean.current = false;
+      clearTimeout(cleaningTimer.current);
+      setCleaning(true);
+      cleaningTimer.current = setTimeout(() => setCleaning(false), 1800);
+      if (!memoryOnly.current) setNotice('청소 완료! 방을 깨끗하게 정리했어요.');
+    }
     setState(current => ({ ...current, quiz: null }));
     requestAnimationFrame(() => {
       // The original action may be disabled after the tenth question.
@@ -156,6 +168,9 @@ export default function App() {
       setStarted(false);
       setName('코코');
       history.current = [];
+      clearTimeout(cleaningTimer.current);
+      setCleaning(false);
+      pendingClean.current = false;
       setState({ pet: defaultPet(), quiz: null });
       setNotice(ok ? '' : '저장소 기록을 삭제하지 못했어요. 브라우저의 사이트 데이터 설정을 확인해 주세요.');
     } catch {
@@ -193,8 +208,9 @@ export default function App() {
             <progress aria-label="성장 경험치" max={stage.next ? stage.next - stage.start : 1} value={stage.next ? Math.min(stage.next - stage.start, Math.max(0, state.pet.totalXp - stage.start)) : 1} />
           </div>
         </div>
-        <Pet pet={state.pet} stage={stage} sick={health.sick} sleeping={nap.sleeping} limitReached={daily.count >= DAILY_LIMIT} />
+        <Pet pet={state.pet} stage={stage} sick={health.sick} sleeping={nap.sleeping} messy={isRoomMessy(state.pet)} cleaning={cleaning} limitReached={daily.count >= DAILY_LIMIT} />
         <div className="pet-caption">{stage.next ? '경험치와 함께한 시간이 모이면 성장해요.' : '멋진 친구로 자랐어요! 계속 함께해요.'}</div>
+        <p className="room-status" role="status">{cleaning ? '✦ 청소 완료! 방이 반짝반짝해요.' : isRoomMessy(state.pet) ? '방에 치울 것이 생겼어요. 청소 문제를 맞혀 함께 정리해요!' : '방이 깔끔해요. 먹이 정답 2번마다 치울 것이 생겨요.'}</p>
         {nap.sleeping && <section className="sleep-details" aria-label="낮잠 상태" role="status">
           <h3>☾ 배불러서 낮잠 자는 중이에요</h3>
           <p>약 {formatWait(nap.remainingMs)} 뒤에 깨어나요. 새로고침해도 같은 시간에 일어나요.</p>

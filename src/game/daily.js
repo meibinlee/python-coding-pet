@@ -1,4 +1,4 @@
-import { answerQuiz, advanceGrowth } from './rules.js';
+import { answerQuiz, advanceGrowth, applyRoomCare } from './rules.js';
 import { refreshHealth, healthStatus, performCare } from './health.js';
 import { startNap, refreshSleep } from './sleep.js';
 import { currentDaily } from './time.js';
@@ -21,7 +21,7 @@ export function submitDaily(state, answer, now = Date.now()) {
     },
   };
   const grown = advanceGrowth(refreshHealth(pet,now),now,result.quiz.correct);
-  return {...result,pet:startNap(state.pet,grown,quiz.action,result.quiz.correct,now)};
+  return {...result,pet:applyRoomCare(startNap(state.pet,grown,quiz.action,result.quiz.correct,now),quiz.action,result.quiz.correct)};
 }
 
 export function basicCare(state, now = Date.now()) {

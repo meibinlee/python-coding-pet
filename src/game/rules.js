@@ -61,3 +61,16 @@ export function answerQuiz(state, answer) {
   const pet = { ...state.pet, totalXp, ...(correct ? { [state.quiz.action]: clamp(state.pet[state.quiz.action] + 15) } : {}) };
   return { ...state, pet, quiz: { ...state.quiz, answered: true, selected: answer, correct, xpChange: totalXp - state.pet.totalXp } };
 }
+
+// Room tidying is a visual goal; it adds no extra status or XP penalty.
+export const ROOM_MESS_FEEDS = 2;
+export const newRoom = () => ({ feedings: 0 });
+export const isRoomMessy = pet => pet.room.feedings >= ROOM_MESS_FEEDS;
+export function applyRoomCare(pet, action, correct) {
+  if (!correct) return pet;
+  if (action === 'cleanliness' && pet.room.feedings !== 0) return { ...pet, room: newRoom() };
+  if (action === 'hunger' && pet.room.feedings < ROOM_MESS_FEEDS) {
+    return { ...pet, room: { feedings: pet.room.feedings + 1 } };
+  }
+  return pet;
+}
