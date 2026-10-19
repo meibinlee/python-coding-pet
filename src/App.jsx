@@ -3,7 +3,7 @@ import Pet from './components/Pet.jsx';
 import StatusBars from './components/StatusBars.jsx';
 import QuizModal from './components/QuizModal.jsx';
 import { nextQuestion } from './game/questions.js';
-import { actions, growth } from './game/rules.js';
+import { actions, growth, growthStatus, refreshGrowth } from './game/rules.js';
 import { currentDaily, nextKoreanMidnight } from './game/time.js';
 import { DAILY_LIMIT, submitStored, updateStored, basicCare } from './game/daily.js';
 import { SAVE_KEY, loadPet, savePet, resetPet, defaultPet } from './game/storage.js';
@@ -23,16 +23,35 @@ export default function App() {
   const trigger = useRef(null);
   const submitting = useRef(false);
   const memoryOnly = useRef(false);
+  const stateRef = useRef(state);
+  stateRef.current = state;
   const stage = growth(state.pet.totalXp, state.pet.level);
+  const growthProgress = growthStatus(state.pet, now);
+  const remainingMinutes = Math.ceil(growthProgress.remainingMs / 60000);
+  const remainingTime = remainingMinutes >= 60 ? `${Math.floor(remainingMinutes / 60)}시간 ${remainingMinutes % 60}분` : `${remainingMinutes}분`;
   const daily = currentDaily(state.pet, now);
 
   useEffect(() => {
     let timer;
+    let active = true;
     const refresh = () => {
       const time = Date.now();
       setNow(time);
       clearTimeout(timer);
-      timer = setTimeout(refresh, Math.min(30000, nextKoreanMidnight(time) - time + 1));
+      const status = growthStatus(stateRef.current.pet, time);
+      timer = setTimeout(refresh, Math.min(30000, nextKoreanMidnight(time) - time + 1, status.remainingMs > 0 ? status.remainingMs + 1 : 30000));
+      if (!submitting.current) {
+        const snapshot = stateRef.current.pet;
+        updateStored(stateRef.current, refreshGrowth, { preferMemory: memoryOnly.current }).then(result => {
+          if (!active) return;
+          setState(current => current.pet === snapshot ? { ...current, pet: result.state.pet } : current);
+          if (!result.saved) { memoryOnly.current = true; setNotice(SAVE_WARNING); }
+          else if (memoryOnly.current && stateRef.current.pet === snapshot) {
+            memoryOnly.current = false;
+            setNotice(current => current === SAVE_WARNING ? '' : current);
+          }
+        }).catch(() => { if (active) setNotice('성장 상태를 확인하지 못했어요. 잠시 후 다시 확인할게요.'); });
+      }
     };
     const sync = event => {
       if (event.key !== SAVE_KEY || submitting.current || memoryOnly.current) return;
@@ -45,6 +64,7 @@ export default function App() {
     document.addEventListener('visibilitychange', refresh);
     window.addEventListener('storage', sync);
     return () => {
+      active = false;
       clearTimeout(timer);
       window.removeEventListener('focus', refresh);
       document.removeEventListener('visibilitychange', refresh);
@@ -81,7 +101,7 @@ export default function App() {
 
   function start(event) {
     event.preventDefault();
-    const pet = { ...state.pet, petName: name.trim() || '코코' };
+    const pet = { ...defaultPet(), petName: name.trim() || '코코' };
     const saved = savePet(pet);
     memoryOnly.current = !saved;
     if (!saved) setNotice(SAVE_WARNING);
@@ -111,15 +131,25 @@ export default function App() {
     });
   }
 
-  function reset() {
+  async function reset() {
     if (submitting.current || !window.confirm('펫과 모든 학습 기록을 초기화할까요?')) return;
-    const ok = resetPet();
-    memoryOnly.current = !ok;
-    setStarted(false);
-    setName('코코');
-    history.current = [];
-    setState({ pet: defaultPet(), quiz: null });
-    setNotice(ok ? '' : '저장소 기록을 삭제하지 못했어요. 브라우저의 사이트 데이터 설정을 확인해 주세요.');
+    submitting.current = true;
+    setPending(true);
+    try {
+      const locks = globalThis.navigator?.locks;
+      const ok = locks?.request ? await locks.request('coding-pet-save', () => resetPet()) : resetPet();
+      memoryOnly.current = !ok;
+      setStarted(false);
+      setName('코코');
+      history.current = [];
+      setState({ pet: defaultPet(), quiz: null });
+      setNotice(ok ? '' : '저장소 기록을 삭제하지 못했어요. 브라우저의 사이트 데이터 설정을 확인해 주세요.');
+    } catch {
+      setNotice('초기화하지 못했어요. 잠시 후 다시 눌러 주세요.');
+    } finally {
+      submitting.current = false;
+      setPending(false);
+    }
   }
 
   return <div className="app">
@@ -146,11 +176,20 @@ export default function App() {
           <div className="xp">
             <span>성장 경험치</span>
             <strong>{state.pet.totalXp} <small>{stage.next ? `/ ${stage.next} XP` : 'XP · 최고 단계'}</small></strong>
-            <progress aria-label="성장 경험치" max={stage.next ? stage.next - stage.start : 1} value={stage.next ? Math.max(0, state.pet.totalXp - stage.start) : 1} />
+            <progress aria-label="성장 경험치" max={stage.next ? stage.next - stage.start : 1} value={stage.next ? Math.min(stage.next - stage.start, Math.max(0, state.pet.totalXp - stage.start)) : 1} />
           </div>
         </div>
         <Pet pet={state.pet} stage={stage} limitReached={daily.count >= DAILY_LIMIT} />
-        <div className="pet-caption">{stage.next ? `다음 모습까지 ${stage.next - state.pet.totalXp} XP` : '멋진 친구로 자랐어요! 계속 함께해요.'}</div>
+        <div className="pet-caption">{stage.next ? '경험치와 함께한 시간이 모이면 성장해요.' : '멋진 친구로 자랐어요! 계속 함께해요.'}</div>
+        {stage.next && <section className="growth-details" aria-label="다음 성장 조건">
+          <h3>{stage.level === 1 ? '아기' : '성체'}가 되려면</h3>
+          <ul>
+            <li>{growthProgress.xpRemaining === 0 ? '✓ 달성' : '○ 더 필요해요'} · 경험치 {state.pet.totalXp} / {stage.next} XP</li>
+            <li>{growthProgress.remainingMs === 0 ? '✓ 달성' : `○ ${remainingTime} 남았어요`} · {stage.level === 1 ? '육성 시작 후 48시간' : '아기가 된 뒤 96시간'}</li>
+            <li>{growthProgress.careDays >= stage.days ? '✓ 달성' : '○ 더 필요해요'} · 돌본 날짜 {Math.min(growthProgress.careDays,stage.days)} / {stage.days}일</li>
+          </ul>
+          <p>세 조건을 모두 채우면 성장해요. 정답 돌봄 또는 기본 돌봄으로 하루를 기록해요. 오답·쓰다듬기는 돌본 날짜에 포함되지 않아요.</p>
+        </section>}
         <StatusBars pet={state.pet} />
         <div className="daily-summary" role="status">
           <strong>오늘 {daily.count} / {DAILY_LIMIT}문제 · 남은 문제 {DAILY_LIMIT - daily.count}개</strong>
@@ -166,7 +205,7 @@ export default function App() {
           <button onClick={() => performUpdate(options => updateStored(state, basicCare, options), '오늘도 곁에서 돌봐 줬어요!')} disabled={pending || daily.careDone}>
             {daily.careDone ? '✓ 오늘 기본 돌봄 완료' : '♡ 기본 돌봄 하기'}
           </button>
-          <p>하루 한 번, 문제를 풀지 않아도 돌볼 수 있어요.<br />XP와 상태 수치는 바뀌지 않아요.<br />오늘 함께한 돌봄을 기록해요.</p>
+          <p>하루 한 번, 문제를 풀지 않아도 돌볼 수 있어요.<br />XP와 상태 수치는 바뀌지 않아요.<br />성장에 필요한 돌본 날짜를 채워요.</p>
         </div>
         <ul className="care-checklist" aria-label="오늘의 돌봄 체크리스트">
           {Object.entries(actions).map(([action, label]) => <li key={action}>{daily.careActions.includes(action) ? '✓ 완료' : '○ 아직'} · {label}</li>)}

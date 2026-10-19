@@ -1,4 +1,4 @@
-import { answerQuiz } from './rules.js';
+import { answerQuiz, advanceGrowth } from './rules.js';
 import { currentDaily } from './time.js';
 import { loadPet, savePet } from './storage.js';
 export const DAILY_LIMIT = 10;
@@ -9,7 +9,7 @@ export function submitDaily(state, answer, now = Date.now()) {
   const daily = currentDaily(state.pet, now);
   if (daily.count >= DAILY_LIMIT || daily.submittedIds.includes(quiz.question.instanceId)) return state;
   const result = answerQuiz(state, answer);
-  return {...result, pet: {...result.pet,
+  const pet = {...result.pet,
     lastCareAt: result.quiz.correct ? new Date(now).toISOString() : state.pet.lastCareAt,
     daily: {
       ...daily,
@@ -17,13 +17,14 @@ export function submitDaily(state, answer, now = Date.now()) {
       submittedIds: [...daily.submittedIds, quiz.question.instanceId],
       careActions: result.quiz.correct ? [...new Set([...daily.careActions,quiz.action])] : daily.careActions,
     },
-  }};
+  };
+  return {...result,pet:advanceGrowth(pet,now,result.quiz.correct)};
 }
 
 export function basicCare(state, now = Date.now()) {
   const daily = currentDaily(state.pet, now);
   if (daily.careDone) return state;
-  return {...state,pet:{...state.pet,lastCareAt:new Date(now).toISOString(),daily:{...daily,careDone:true}}};
+  return {...state,pet:advanceGrowth({...state.pet,lastCareAt:new Date(now).toISOString(),daily:{...daily,careDone:true}},now,true)};
 }
 
 // The lock covers read, adjudication and write across tabs of this origin.
@@ -35,8 +36,8 @@ export async function updateStored(state, update, { storage, locks = globalThis.
     const latest = loaded.isNew || preferMemory ? state.pet : loaded.pet;
     const base = {...state,pet:latest};
     const result = update(base,time);
-    if (result === base) return {state:base,saved:true,blocked:true};
-    return {state:result,saved:savePet(result.pet,storage,time),blocked:false};
+    if (result === base && !loaded.migrated && !preferMemory) return {state:base,saved:true,blocked:true};
+    return {state:result,saved:savePet(result.pet,storage,time),blocked:result===base};
   };
   return locks?.request ? locks.request('coding-pet-save',run) : run();
 }
