@@ -22,3 +22,18 @@ it('preserves valid daily records and resets stale, future or malformed records'
     expect(validateSave({...pet,daily},now)).toMatchObject({totalXp:0,daily:{count:0}});
   }
 });
+it('corrects future care timestamps while retaining the pet and reports recovery',async()=>{
+  const {loadPet}=await import('../src/game/storage.js');
+  const pet={...defaultPet(now),totalXp:190,lastCareAt:new Date(now+DAY_MS).toISOString(),lastUpdatedAt:new Date(now+DAY_MS).toISOString()};
+  const storage={getItem:()=>JSON.stringify(pet)};
+  const result=loadPet(storage,now);
+  expect(result.isNew).toBe(false);expect(result.error).toBeTruthy();
+  expect(result.pet.totalXp).toBe(190);
+  expect(result.pet.lastCareAt).toBe(new Date(now).toISOString());
+  expect(result.pet.lastUpdatedAt).toBe(new Date(now).toISOString());
+});
+it('preserves a complete checklist on reload and resets it at Korean midnight',()=>{
+  const pet={...defaultPet(now),daily:{date:'2026-10-19',count:1,submittedIds:['a'],careDone:true,careActions:['hunger','unknown','hunger']}};
+  expect(validateSave(pet,now).daily).toMatchObject({count:1,careDone:true,careActions:['hunger']});
+  expect(validateSave(pet,now+1).daily).toMatchObject({count:0,careDone:false,careActions:[]});
+});

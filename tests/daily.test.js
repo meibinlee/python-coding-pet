@@ -44,3 +44,43 @@ it('continues in memory when storage is unavailable',async()=>{
   const result=await submitStored(state(),'4',{storage,locks:null,now});
   expect(result.saved).toBe(false);expect(result.state.pet.daily.count).toBe(1);
 });
+it('allows basic care after ten wrong answers without XP or stat changes',async()=>{
+  const {basicCare}=await import('../src/game/daily.js');
+  let pet=defaultPet(now);
+  for(let i=0;i<10;i++)pet=submitDaily(state(pet,`wrong-${i}`),'5',now).pet;
+  const s=state(pet);const cared=basicCare(s,now);
+  expect(cared.pet).toMatchObject({totalXp:0,hunger:70,cleanliness:70,affection:70,daily:{count:10,careDone:true,careActions:[]}});
+  expect(basicCare(cared,now)).toBe(cared);
+  expect(basicCare(cared,now+1).pet.daily).toMatchObject({date:'2026-10-20',count:0,careDone:true});
+});
+it('only correct care records a checklist action and care timestamp',()=>{
+  const before=now-1000,s=state(defaultPet(before));
+  expect(submitDaily(s,'5',now).pet.lastCareAt).toBe(s.pet.lastCareAt);
+  const right=submitDaily(s,'4',now);
+  expect(right.pet.lastCareAt).toBe(new Date(now).toISOString());
+  expect(right.pet.daily.careActions).toEqual(['hunger']);
+});
+it('retains unsaved wrong-answer counts when subsequent reads still work',async()=>{
+  const storage=memory();savePet(defaultPet(now),storage);
+  storage.setItem=()=>{throw Error('full');};
+  const first=await submitStored(state(defaultPet(now),'first'),'5',{storage,locks:null,now});
+  expect(first.saved).toBe(false);
+  const second=await submitStored(state(first.state.pet,'second'),'5',{storage,locks:null,now,preferMemory:true});
+  expect(second.state.pet.daily.count).toBe(2);expect(second.state.pet.totalXp).toBe(0);
+});
+it('serializes simultaneous answers at the daily limit',async()=>{
+  const storage=memory();let pet=defaultPet(now);
+  for(let i=0;i<9;i++)pet=submitDaily(state(pet,`old-${i}`),'5',now).pet;
+  savePet(pet,storage);
+  let queue=Promise.resolve();const locks={request(name,fn){const result=queue.then(fn);queue=result;return result;}};
+  const results=await Promise.all(['a','b'].map(id=>submitStored(state(pet,id),'4',{storage,locks,now})));
+  expect(results.filter(r=>r.blocked)).toHaveLength(1);
+  expect(loadPet(storage,now).pet).toMatchObject({totalXp:10,daily:{count:10}});
+});
+it('records independent care without erasing another tab answer',async()=>{
+  const {basicCare,updateStored}=await import('../src/game/daily.js');
+  const storage=memory();const initial=state(defaultPet(now));savePet(initial.pet,storage);
+  await submitStored(state(initial.pet,'other-tab'),'4',{storage,locks:null,now});
+  await updateStored(initial,basicCare,{storage,locks:null,now});
+  expect(loadPet(storage,now).pet).toMatchObject({totalXp:10,daily:{count:1,careDone:true,careActions:['hunger']}});
+});
