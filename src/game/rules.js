@@ -1,4 +1,5 @@
 import { isCorrect } from './questions.js';
+import { refreshHealth } from './health.js';
 import { DAY_MS, koreanDate } from './time.js';
 
 export const actions = { hunger: '먹이 주기', cleanliness: '청소하기', affection: '놀아주기' };
@@ -39,7 +40,7 @@ export function advanceGrowth(pet, now = Date.now(), cared = false) {
     }
   }
   const status = growthStatus(updated, now);
-  if (status.next === null || status.xpRemaining > 0 || status.remainingMs > 0 || status.careDays < status.days || updated.sick) return updated;
+  if (status.next === null || status.xpRemaining > 0 || status.remainingMs > 0 || status.careDays < status.days || updated.health.sickSince) return updated;
   const nextLevel = updated.level + 1;
   // One transition only. The next stage's elapsed time starts right now.
   return { ...updated, level: nextLevel, lastCareAt: new Date(now).toISOString(), growth: {
@@ -49,7 +50,7 @@ export function advanceGrowth(pet, now = Date.now(), cared = false) {
   } };
 }
 export function refreshGrowth(state, now = Date.now()) {
-  const pet = advanceGrowth(state.pet, now);
+  const pet = advanceGrowth(refreshHealth(state.pet, now), now);
   return pet === state.pet ? state : { ...state, pet };
 }
 export function answerQuiz(state, answer) {

@@ -1,4 +1,5 @@
 import { answerQuiz, advanceGrowth } from './rules.js';
+import { refreshHealth, healthStatus, performCare } from './health.js';
 import { currentDaily } from './time.js';
 import { loadPet, savePet } from './storage.js';
 export const DAILY_LIMIT = 10;
@@ -8,9 +9,9 @@ export function submitDaily(state, answer, now = Date.now()) {
   if (!quiz || quiz.answered || !quiz.question.options.includes(answer)) return state;
   const daily = currentDaily(state.pet, now);
   if (daily.count >= DAILY_LIMIT || daily.submittedIds.includes(quiz.question.instanceId)) return state;
-  const result = answerQuiz(state, answer);
+  const result = answerQuiz({...state,pet:refreshHealth(state.pet,now)}, answer);
   const pet = {...result.pet,
-    lastCareAt: result.quiz.correct ? new Date(now).toISOString() : state.pet.lastCareAt,
+    lastCareAt: result.quiz.correct ? new Date(now).toISOString() : result.pet.lastCareAt,
     daily: {
       ...daily,
       count: daily.count + 1,
@@ -18,13 +19,14 @@ export function submitDaily(state, answer, now = Date.now()) {
       careActions: result.quiz.correct ? [...new Set([...daily.careActions,quiz.action])] : daily.careActions,
     },
   };
-  return {...result,pet:advanceGrowth(pet,now,result.quiz.correct)};
+  return {...result,pet:advanceGrowth(refreshHealth(pet,now),now,result.quiz.correct)};
 }
 
 export function basicCare(state, now = Date.now()) {
   const daily = currentDaily(state.pet, now);
-  if (daily.careDone) return state;
-  return {...state,pet:advanceGrowth({...state.pet,lastCareAt:new Date(now).toISOString(),daily:{...daily,careDone:true}},now,true)};
+  if (!healthStatus(state.pet,now).canCare) return state;
+  const cared = performCare(state.pet,now);
+  return {...state,pet:advanceGrowth({...cared,daily:{...daily,careDone:true,nursingDone:daily.nursingDone||Boolean(refreshHealth(state.pet,now).health.sickSince)}},now,true)};
 }
 
 // The lock covers read, adjudication and write across tabs of this origin.

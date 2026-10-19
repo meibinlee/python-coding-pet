@@ -8,7 +8,7 @@ export function nextKoreanMidnight(now = Date.now()) {
   return Date.parse(`${koreanDate(now)}T00:00:00+09:00`) + DAY_MS;
 }
 export function emptyDaily(now = Date.now()) {
-  return { date: koreanDate(now), count: 0, submittedIds: [], careDone: false, careActions: [] };
+  return { date: koreanDate(now), count: 0, submittedIds: [], careDone: false, nursingDone: false, careActions: [] };
 }
 export function currentDaily(pet, now = Date.now()) {
   return pet.daily?.date === koreanDate(now) ? pet.daily : emptyDaily(now);
