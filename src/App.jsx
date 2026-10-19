@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import Pet from './components/Pet.jsx';
 import StatusBars from './components/StatusBars.jsx';
+import CharacterSelector from './components/CharacterSelector.jsx';
+import GrowthAlbum from './components/GrowthAlbum.jsx';
+import { characterImage, characterFor } from './data/characters.js';
+import { selectCharacter } from './game/album.js';
 import QuizModal from './components/QuizModal.jsx';
 import { nextQuestion } from './game/questions.js';
 import { actions, growth, growthStatus, refreshGrowth, isRoomMessy } from './game/rules.js';
@@ -9,7 +13,7 @@ import { isOnVacation } from './game/vacation.js';
 import { healthStatus } from './game/health.js';
 import { currentDaily, nextKoreanMidnight } from './game/time.js';
 import { DAILY_LIMIT, submitStored, updateStored, basicCare, setVacation } from './game/daily.js';
-import { SAVE_KEY, loadPet, savePet, resetPet, defaultPet } from './game/storage.js';
+import { SAVE_KEY, loadPet, savePet, resetPet, defaultPet, createPet } from './game/storage.js';
 
 const SAVE_WARNING = '자동 저장에 실패했어요. 이 창을 닫으면 기록이 사라질 수 있어요.';
 const LIMIT_MESSAGE = '오늘의 10문제를 모두 풀었어요. 한국 시간 자정부터 다시 풀 수 있어요.';
@@ -24,12 +28,15 @@ export default function App() {
   const [state, setState] = useState({ pet: loaded.pet, quiz: null });
   const [started, setStarted] = useState(!loaded.isNew);
   const [name, setName] = useState(loaded.pet.petName);
+  const [character, setCharacter] = useState(loaded.pet.characterId ?? 'chiikawa');
   const [notice, setNotice] = useState(loaded.error);
   const [now, setNow] = useState(Date.now);
   const [pending, setPending] = useState(false);
-  const [cleaning, setCleaning] = useState(false);
-  const cleaningTimer = useRef(null);
-  const pendingClean = useRef(false);
+  const [reaction, setReaction] = useState(null);
+  const cleaning = reaction === 'clean';
+  const playing = reaction === 'play';
+  const reactionTimer = useRef(null);
+  const pendingReaction = useRef(null);
   const history = useRef([]);
   const trigger = useRef(null);
   const submitting = useRef(false);
@@ -80,7 +87,7 @@ export default function App() {
     window.addEventListener('storage', sync);
     return () => {
       active = false;
-      clearTimeout(cleaningTimer.current);
+      clearTimeout(reactionTimer.current);
       clearTimeout(timer);
       window.removeEventListener('focus', refresh);
       document.removeEventListener('visibilitychange', refresh);
@@ -95,7 +102,7 @@ export default function App() {
     try {
       const result = await update({ preferMemory: memoryOnly.current });
       setState(result.state);
-      if (!result.blocked && result.state.quiz?.correct && result.state.quiz.action === 'cleanliness') pendingClean.current = true;
+      if (!result.blocked && result.state.quiz?.correct && ['cleanliness','affection'].includes(result.state.quiz.action)) pendingReaction.current = result.state.quiz.action === 'cleanliness' ? 'clean' : 'play';
       setNow(Date.now());
       if (!result.saved) {
         memoryOnly.current = true;
@@ -118,7 +125,7 @@ export default function App() {
 
   function start(event) {
     event.preventDefault();
-    const pet = { ...defaultPet(), petName: name.trim() || '코코' };
+    const pet = createPet(name,character);
     const saved = savePet(pet);
     memoryOnly.current = !saved;
     if (!saved) setNotice(SAVE_WARNING);
@@ -148,12 +155,13 @@ export default function App() {
 
   function closeQuiz() {
     if (submitting.current) return;
-    if (pendingClean.current) {
-      pendingClean.current = false;
-      clearTimeout(cleaningTimer.current);
-      setCleaning(true);
-      cleaningTimer.current = setTimeout(() => setCleaning(false), 1800);
-      if (!memoryOnly.current) setNotice('청소 완료! 방을 깨끗하게 정리했어요.');
+    if (pendingReaction.current) {
+      const kind = pendingReaction.current;
+      pendingReaction.current = null;
+      clearTimeout(reactionTimer.current);
+      setReaction(kind);
+      reactionTimer.current = setTimeout(() => setReaction(null), 1800);
+      if (!memoryOnly.current) setNotice(kind === 'clean' ? '청소 완료! 방을 깨끗하게 정리했어요.' : '함께 신나게 놀았어요!');
     }
     setState(current => ({ ...current, quiz: null }));
     requestAnimationFrame(() => {
@@ -174,9 +182,10 @@ export default function App() {
       setStarted(false);
       setName('코코');
       history.current = [];
-      clearTimeout(cleaningTimer.current);
-      setCleaning(false);
-      pendingClean.current = false;
+      clearTimeout(reactionTimer.current);
+      setReaction(null);
+      pendingReaction.current = null;
+      setCharacter('chiikawa');
       setState({ pet: defaultPet(), quiz: null });
       setNotice(ok ? '' : '저장소 기록을 삭제하지 못했어요. 브라우저의 사이트 데이터 설정을 확인해 주세요.');
     } catch {
@@ -199,13 +208,18 @@ export default function App() {
         <p>문제를 풀고, 나만의 작은 친구를 돌봐요.</p>
       </div>
       {!started ? <form className="welcome card" onSubmit={start}>
-        <img src={`${import.meta.env.BASE_URL}pets/egg.svg`} alt="새로운 알 친구" />
+        <img src={characterImage(character,1,'normal',import.meta.env.BASE_URL)} alt={`${characterFor(character).name} 알 모습`} className="welcome-egg" />
         <h2>우리 처음 만났네!</h2>
-        <label htmlFor="pet-name">펫에게 이름을 지어 주세요</label>
+        <CharacterSelector value={character} onChange={setCharacter} /><label htmlFor="pet-name">펫에게 이름을 지어 주세요</label>
         <input id="pet-name" maxLength={20} value={name} onChange={event => setName(event.target.value)} autoComplete="off" />
         <p>학생 이름 대신 펫 이름만 입력해 주세요.</p>
         <button className="primary">함께 시작하기 →</button>
-      </form> : <section className="card pet-card" aria-label="나의 펫">
+      </form> : !state.pet.characterId ? <section className="card welcome" aria-label="기존 펫의 친구 선택">
+        <h2>{state.pet.petName}의 모습을 골라 주세요</h2>
+        <p>기존 XP {state.pet.totalXp}와 성장 단계·돌봄 기록을 그대로 유지해요.</p>
+        <CharacterSelector value={character} onChange={setCharacter} disabled={pending} />
+        <button className="primary" disabled={pending} onClick={() => performUpdate(options=>updateStored(state,current=>selectCharacter(current,character),options),'선택한 친구와 계속 함께해요!','다른 창에서 이미 친구를 선택했어요. 그 친구와 계속 함께해요.')}>이 친구와 계속하기</button>
+      </section> : <section className="card pet-card" aria-label="나의 펫">
         <div className="pet-heading">
           <div><span className="tag">Lv.{stage.level} · {stage.name}</span><h2>{state.pet.petName}<span className="tiny-heart"> ♥</span></h2></div>
           <div className="xp">
@@ -225,7 +239,7 @@ export default function App() {
             '이미 휴가 상태가 바뀌었어요. 현재 상태를 확인해 주세요.'
           )}>{onVacation ? '휴가 마치기' : '휴가 시작하기'}</button>
         </section>
-        <Pet pet={state.pet} stage={stage} sick={health.sick} sleeping={nap.sleeping} messy={isRoomMessy(state.pet)} cleaning={cleaning} vacation={onVacation} limitReached={daily.count >= DAILY_LIMIT} />
+        <Pet pet={state.pet} stage={stage} sick={health.sick} sleeping={nap.sleeping} messy={isRoomMessy(state.pet)} cleaning={cleaning} playing={playing} vacation={onVacation} limitReached={daily.count >= DAILY_LIMIT} />
         <div className="pet-caption">{stage.next ? '경험치와 함께한 시간이 모이면 성장해요.' : '멋진 친구로 자랐어요! 계속 함께해요.'}</div>
         <p className="room-status" role="status">{onVacation ? '방 정리도 휴가를 마친 뒤 이어갈 수 있어요.' : cleaning ? '✦ 청소 완료! 방이 반짝반짝해요.' : isRoomMessy(state.pet) ? '방에 치울 것이 생겼어요. 청소 문제를 맞혀 함께 정리해요!' : '방이 깔끔해요. 먹이 정답 2번마다 치울 것이 생겨요.'}</p>
         {nap.sleeping && <section className="sleep-details" aria-label="낮잠 상태" role="status">
@@ -277,6 +291,7 @@ export default function App() {
           {Object.entries(actions).map(([action, label]) => <li key={action}>{daily.careActions.includes(action) ? '✓ 완료' : '○ 아직'} · {label}</li>)}
           <li>{daily.careDone ? '✓ 완료' : '○ 아직'} · {daily.nursingDone ? '간호' : '기본 돌봄 / 간호'}</li>
         </ul>
+        <GrowthAlbum pet={state.pet} />
         <p className="hint">✦ 코딩 문제 하나, 쑥쑥 자라는 우리 펫</p>
       </section>}
       <div className="learning-note"><span>✎</span><div><strong>매번 새로운 작은 도전</strong><p>6개 영역 · 30가지 문제 패턴으로 텍스트 기반 프로그래밍을 복습해요.</p></div></div>

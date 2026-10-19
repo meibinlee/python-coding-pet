@@ -1,3 +1,4 @@
+import { recordStage } from './album.js';
 import { isCorrect } from './questions.js';
 import { refreshSleep } from './sleep.js';
 import { refreshHealth } from './health.js';
@@ -46,7 +47,7 @@ export function advanceGrowth(pet, now = Date.now(), cared = false) {
   if (status.next === null || status.xpRemaining > 0 || status.remainingMs > 0 || status.careDays < status.days || updated.health.sickSince) return updated;
   const nextLevel = updated.level + 1;
   // One transition only. The next stage's elapsed time starts right now.
-  return { ...updated, level: nextLevel, lastCareAt: new Date(now).toISOString(), health: { ...updated.health, carePausedMs: 0 }, growth: {
+  return { ...updated, level: nextLevel, album: recordStage(updated.album,nextLevel,updated.characterId,now), lastCareAt: new Date(now).toISOString(), health: { ...updated.health, carePausedMs: 0 }, growth: {
     ...updated.growth,
     enteredAt: new Date(now).toISOString(),
     pausedMs: 0,

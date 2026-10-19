@@ -2,12 +2,16 @@ import { growth, newGrowthRecord, newRoom, ROOM_MESS_FEEDS } from './rules.js';
 import { newHealth } from './health.js';
 import { newSleep, normalizeSleep, validSleep } from './sleep.js';
 import { newVacation, normalizeVacation } from './vacation.js';
+import { isCharacterId } from '../data/characters.js';
+import { newAlbum, normalizeAlbum } from './album.js';
 import { emptyDaily, koreanDate } from './time.js';
 
 export const SAVE_KEY = 'coding-pet-save-v1';
 export const defaultPet = (now = Date.now()) => ({
   schemaVersion: 2,
   petName: '코코',
+  characterId: null,
+  album: newAlbum(null,now),
   hunger: 70,
   cleanliness: 70,
   affection: 70,
@@ -82,11 +86,13 @@ export function validateSave(data, now = Date.now()) {
 
   // Keep the existing storage key; migrate the payload without resetting the pet.
   const pet = Object.fromEntries(Object.keys(defaultPet(now))
-    .filter(key => !['daily', 'lastCareAt', 'level', 'growth', 'schemaVersion', 'health', 'sleep', 'room', 'vacation'].includes(key)).map(key => [key, data[key]]));
+    .filter(key => !['daily', 'lastCareAt', 'level', 'growth', 'schemaVersion', 'health', 'sleep', 'room', 'vacation', 'characterId', 'album'].includes(key)).map(key => [key, data[key]]));
   pet.schemaVersion = 2;
   const savedLevel = [1,2,3].includes(data.level) ? data.level : 1;
   pet.level = data.schemaVersion === 1 ? Math.max(savedLevel,growth(data.totalXp).level) : savedLevel;
   pet.growth = data.schemaVersion === 1 ? newGrowthRecord(now) : normalizeGrowth(data.growth, pet.level, now);
+  pet.characterId = isCharacterId(data.characterId) ? data.characterId : null;
+  pet.album = normalizeAlbum(data.album,pet,now);
   const daily = data.daily;
   pet.daily = validDaily(daily) && daily.date === koreanDate(now)
     ? {
@@ -131,10 +137,16 @@ export function loadPet(storage, now = Date.now()) {
     const correctedSleep = data.sleep !== undefined && !validSleep(data.sleep,now);
     const changedRoom = JSON.stringify(data.room) !== JSON.stringify(pet.room);
     const correctedRoom = data.room !== undefined && !validRoom(data.room);
-    const corrected = correctedVacation || correctedRoom || correctedSleep || correctedGrowth || correctedHealth || (data.daily !== undefined && (!validDaily(data.daily) || data.daily.date > koreanDate(now))) ||
+    const changedCharacter = data.characterId !== pet.characterId;
+    const changedAlbum = JSON.stringify(data.album) !== JSON.stringify(pet.album);
+    const invalidAlbum = data.album !== undefined && (!Array.isArray(data.album) || data.album.some(entry =>
+      !entry || ![1,2,3].includes(entry.level) || entry.level > pet.level ||
+      (entry.reachedAt !== null && (typeof entry.reachedAt !== 'string' || !Number.isFinite(Date.parse(entry.reachedAt)) || Date.parse(entry.reachedAt) > now))));
+    const correctedCharacter = data.characterId !== undefined && data.characterId !== null && changedCharacter;
+    const corrected = correctedCharacter || invalidAlbum || correctedVacation || correctedRoom || correctedSleep || correctedGrowth || correctedHealth || (data.daily !== undefined && (!validDaily(data.daily) || data.daily.date > koreanDate(now))) ||
       Date.parse(data.lastUpdatedAt) > now ||
       (data.lastCareAt !== undefined && (typeof data.lastCareAt !== 'string' || !Number.isFinite(Date.parse(data.lastCareAt)) || Date.parse(data.lastCareAt) > now));
-    return { pet, isNew: false, migrated: data.schemaVersion !== 2 || changedGrowth || changedHealth || changedVacation || changedSleep || changedRoom || corrected, error: corrected ? '날짜 또는 돌봄 기록이 올바르지 않아 보정했어요. 펫과 경험치는 유지했어요.' : '' };
+    return { pet, isNew: false, migrated: data.schemaVersion !== 2 || changedGrowth || changedHealth || changedVacation || changedSleep || changedRoom || changedCharacter || changedAlbum || corrected, error: corrected ? '날짜 또는 돌봄 기록이 올바르지 않아 보정했어요. 펫과 경험치는 유지했어요.' : '' };
   } catch {
     return { pet: defaultPet(now), isNew: true, error: '저장소를 사용할 수 없거나 기록이 손상되었어요. 현재 게임은 계속할 수 있어요.' };
   }
@@ -152,4 +164,9 @@ export function resetPet(storage) {
     (storage ?? globalThis.localStorage).removeItem(SAVE_KEY);
     return true;
   } catch { return false; }
+}
+
+export function createPet(petName, characterId, now = Date.now()) {
+  if (!isCharacterId(characterId)) throw new Error('친구를 선택해 주세요.');
+  return { ...defaultPet(now), petName: petName.trim().slice(0,20) || '코코', characterId, album: newAlbum(characterId,now) };
 }
