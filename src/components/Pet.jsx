@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-export default function Pet({ pet, stage, limitReached = false, sick = false, sleeping = false, messy = false, cleaning = false }) {
+export default function Pet({ pet, stage, limitReached = false, sick = false, sleeping = false, messy = false, cleaning = false, vacation = false }) {
   const [petted, setPetted] = useState(false);
   const cooldown = useRef(false);
   const timer = useRef(null);
@@ -18,6 +18,7 @@ export default function Pet({ pet, stage, limitReached = false, sick = false, sl
 
   const message = cleaning ? '반짝반짝! 청소를 마쳤어! ✦'
     : petted ? '쓰다듬어 줘서 고마워! ♥'
+    : vacation ? '다녀와! 여기서 편안히 쉬고 있을게 ☀'
     : sleeping ? (sick ? '조금 아파서 쉬고 있어. 간호해 줄래?' : '배불러서 잠깐 쉬고 있어… Zzz')
     : sick ? '조금 아파. 곁에서 보살펴 줄래?'
     : limitReached ? '오늘도 수고했어! 함께 쉬자.'
@@ -29,7 +30,7 @@ export default function Pet({ pet, stage, limitReached = false, sick = false, sl
     <span className="spark s1" aria-hidden="true">✧</span>
     <span className="spark s2" aria-hidden="true">✦</span>
     <div className="bubble" role="status">{message}</div>
-    <button className={`pet-button${petted ? ' petted' : ''}${sick ? ' sick-pet' : ''}${sleeping ? ' sleeping-pet' : ''}`} onClick={petFriend} aria-label={`${pet.petName} 쓰다듬기`}>
+    <button className={`pet-button${petted ? ' petted' : ''}${sick ? ' sick-pet' : ''}${sleeping ? ' sleeping-pet' : ''}${vacation ? ' vacation-pet' : ''}`} onClick={petFriend} aria-label={`${pet.petName} 쓰다듬기`}>
       <img className="pet" src={`${import.meta.env.BASE_URL}pets/${stage.image}.svg`} alt={`${stage.name} 모습의 ${pet.petName}`} />
       {sleeping && <span className="sleep-mark" aria-hidden="true">Zzz</span>}
       {sick && <span className="pet-bandage" aria-hidden="true">✚</span>}

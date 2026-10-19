@@ -1,6 +1,7 @@
 import { growth, newGrowthRecord, newRoom, ROOM_MESS_FEEDS } from './rules.js';
 import { newHealth } from './health.js';
 import { newSleep, normalizeSleep, validSleep } from './sleep.js';
+import { newVacation, normalizeVacation } from './vacation.js';
 import { emptyDaily, koreanDate } from './time.js';
 
 export const SAVE_KEY = 'coding-pet-save-v1';
@@ -16,6 +17,7 @@ export const defaultPet = (now = Date.now()) => ({
   health: newHealth(),
   sleep: newSleep(),
   room: newRoom(),
+  vacation: newVacation(),
   lastUpdatedAt: new Date(now).toISOString(),
   daily: emptyDaily(now),
   lastCareAt: new Date(now).toISOString(),
@@ -47,18 +49,24 @@ function normalizeGrowth(record, level, now) {
       new Date(date).toISOString().slice(0,10) === date && date <= koreanDate(now) &&
       (stage !== level || date >= koreanDate(Date.parse(start)))))].sort().slice(0,stage===1?2:stage===2?4:1);
   }
-  return { startedAt, enteredAt, careDates };
+  const since = level === 1 ? startedAt : enteredAt;
+  return { startedAt, enteredAt, pausedMs: pauseMs(record.pausedMs,now-Date.parse(since)), careDates };
 }
 
-function normalizeHealth(record, level, now) {
-  if (level === 1 || !record || typeof record !== 'object' || !record.sickSince) return newHealth();
+function pauseMs(value, max) {
+  return Number.isSafeInteger(value) && value >= 0 && value <= Math.max(0,max) ? value : 0;
+}
+function normalizeHealth(record, level, now, lastCareAt) {
+  const carePausedMs = level >= 2 ? pauseMs(record?.carePausedMs,now-Date.parse(lastCareAt)) : 0;
+  if (level === 1 || !record || typeof record !== 'object' || !record.sickSince) return { ...newHealth(), carePausedMs };
   const sickSince = safeTimestamp(record.sickSince,now);
   const recoveryStartedAt = record.recoveryStartedAt
     ? new Date(Math.max(Date.parse(sickSince),Date.parse(safeTimestamp(record.recoveryStartedAt,now)))).toISOString() : null;
   const followUpAt = recoveryStartedAt && record.followUpAt ? safeTimestamp(record.followUpAt,now) : null;
   const validFollowUp = followUpAt && Date.parse(followUpAt) >= Date.parse(recoveryStartedAt) &&
     koreanDate(Date.parse(followUpAt)) !== koreanDate(Date.parse(recoveryStartedAt));
-  return { sickSince, recoveryStartedAt, followUpAt: validFollowUp ? followUpAt : null };
+  return { sickSince, recoveryStartedAt, followUpAt: validFollowUp ? followUpAt : null, carePausedMs,
+    recoveryPausedMs: recoveryStartedAt ? pauseMs(record.recoveryPausedMs,now-Date.parse(recoveryStartedAt)) : 0 };
 }
 
 function validRoom(record) {
@@ -74,7 +82,7 @@ export function validateSave(data, now = Date.now()) {
 
   // Keep the existing storage key; migrate the payload without resetting the pet.
   const pet = Object.fromEntries(Object.keys(defaultPet(now))
-    .filter(key => !['daily', 'lastCareAt', 'level', 'growth', 'schemaVersion', 'health', 'sleep', 'room'].includes(key)).map(key => [key, data[key]]));
+    .filter(key => !['daily', 'lastCareAt', 'level', 'growth', 'schemaVersion', 'health', 'sleep', 'room', 'vacation'].includes(key)).map(key => [key, data[key]]));
   pet.schemaVersion = 2;
   const savedLevel = [1,2,3].includes(data.level) ? data.level : 1;
   pet.level = data.schemaVersion === 1 ? Math.max(savedLevel,growth(data.totalXp).level) : savedLevel;
@@ -94,7 +102,8 @@ export function validateSave(data, now = Date.now()) {
     : emptyDaily(now);
   pet.room = validRoom(data.room) ? { feedings: data.room.feedings } : newRoom();
   pet.sleep = normalizeSleep(data.sleep,now);
-  pet.health = normalizeHealth(data.health, pet.level, now);
+  pet.vacation = normalizeVacation(data.vacation,now);
+  pet.health = normalizeHealth(data.health, pet.level, now, data.lastCareAt);
   pet.lastCareAt = data.schemaVersion === 1 || data.health === undefined ? new Date(now).toISOString() : safeTimestamp(data.lastCareAt, now);
   if (data.schemaVersion === 1 && (pet.daily.careDone || pet.daily.careActions.length > 0)) {
     pet.growth.careDates[pet.level] = [koreanDate(now)];
@@ -110,16 +119,22 @@ export function loadPet(storage, now = Date.now()) {
     const data = JSON.parse(raw);
     const pet = validateSave(data, now);
     if (!pet) return { pet: defaultPet(now), isNew: true, error: '저장 기록을 읽을 수 없어 기본 상태로 복구했어요.' };
-    const correctedGrowth = data.schemaVersion === 2 && JSON.stringify(data.growth) !== JSON.stringify(pet.growth);
-    const correctedHealth = data.health !== undefined && JSON.stringify(data.health) !== JSON.stringify(pet.health);
+    const changedGrowth = JSON.stringify(data.growth) !== JSON.stringify(pet.growth);
+    const oldGrowth = data.growth && { startedAt:data.growth.startedAt, enteredAt:data.growth.enteredAt, pausedMs:data.growth.pausedMs ?? 0, careDates:data.growth.careDates };
+    const correctedGrowth = data.schemaVersion === 2 && JSON.stringify(oldGrowth) !== JSON.stringify(pet.growth);
+    const oldHealth = data.health && { sickSince:data.health.sickSince,recoveryStartedAt:data.health.recoveryStartedAt,followUpAt:data.health.followUpAt,carePausedMs:data.health.carePausedMs ?? 0,recoveryPausedMs:data.health.recoveryPausedMs ?? 0 };
+    const changedHealth = JSON.stringify(data.health) !== JSON.stringify(pet.health);
+    const correctedHealth = data.health !== undefined && JSON.stringify(oldHealth) !== JSON.stringify(pet.health);
+    const changedVacation = JSON.stringify(data.vacation) !== JSON.stringify(pet.vacation);
+    const correctedVacation = data.vacation !== undefined && changedVacation;
     const changedSleep = JSON.stringify(data.sleep) !== JSON.stringify(pet.sleep);
     const correctedSleep = data.sleep !== undefined && !validSleep(data.sleep,now);
     const changedRoom = JSON.stringify(data.room) !== JSON.stringify(pet.room);
     const correctedRoom = data.room !== undefined && !validRoom(data.room);
-    const corrected = correctedRoom || correctedSleep || correctedGrowth || correctedHealth || (data.daily !== undefined && (!validDaily(data.daily) || data.daily.date > koreanDate(now))) ||
+    const corrected = correctedVacation || correctedRoom || correctedSleep || correctedGrowth || correctedHealth || (data.daily !== undefined && (!validDaily(data.daily) || data.daily.date > koreanDate(now))) ||
       Date.parse(data.lastUpdatedAt) > now ||
       (data.lastCareAt !== undefined && (typeof data.lastCareAt !== 'string' || !Number.isFinite(Date.parse(data.lastCareAt)) || Date.parse(data.lastCareAt) > now));
-    return { pet, isNew: false, migrated: data.schemaVersion !== 2 || data.health === undefined || changedSleep || changedRoom || corrected, error: corrected ? '날짜 또는 돌봄 기록이 올바르지 않아 보정했어요. 펫과 경험치는 유지했어요.' : '' };
+    return { pet, isNew: false, migrated: data.schemaVersion !== 2 || changedGrowth || changedHealth || changedVacation || changedSleep || changedRoom || corrected, error: corrected ? '날짜 또는 돌봄 기록이 올바르지 않아 보정했어요. 펫과 경험치는 유지했어요.' : '' };
   } catch {
     return { pet: defaultPet(now), isNew: true, error: '저장소를 사용할 수 없거나 기록이 손상되었어요. 현재 게임은 계속할 수 있어요.' };
   }

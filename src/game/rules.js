@@ -1,6 +1,7 @@
 import { isCorrect } from './questions.js';
 import { refreshSleep } from './sleep.js';
 import { refreshHealth } from './health.js';
+import { isOnVacation, vacationTime } from './vacation.js';
 import { DAY_MS, koreanDate } from './time.js';
 
 export const actions = { hunger: '먹이 주기', cleanliness: '청소하기', affection: '놀아주기' };
@@ -18,7 +19,7 @@ export function growth(xp, savedLevel) {
 }
 export function newGrowthRecord(now = Date.now()) {
   const timestamp = new Date(now).toISOString();
-  return { startedAt: timestamp, enteredAt: timestamp, careDates: { 1: [], 2: [], 3: [] } };
+  return { startedAt: timestamp, enteredAt: timestamp, pausedMs: 0, careDates: { 1: [], 2: [], 3: [] } };
 }
 export function growthStatus(pet, now = Date.now()) {
   const stage = growth(pet.totalXp, pet.level);
@@ -26,11 +27,12 @@ export function growthStatus(pet, now = Date.now()) {
   return {
     ...stage,
     xpRemaining: stage.next === null ? 0 : Math.max(0, stage.next - pet.totalXp),
-    remainingMs: stage.next === null ? 0 : Math.max(0, Date.parse(since) + stage.duration - now),
+    remainingMs: stage.next === null ? 0 : Math.max(0, Date.parse(since) + stage.duration + pet.growth.pausedMs - vacationTime(pet,now)),
     careDays: pet.growth.careDates[pet.level].length,
   };
 }
 export function advanceGrowth(pet, now = Date.now(), cared = false) {
+  if (isOnVacation(pet)) return pet;
   let updated = pet;
   const today = koreanDate(now);
   if (cared && pet.level < 3) {
@@ -44,9 +46,10 @@ export function advanceGrowth(pet, now = Date.now(), cared = false) {
   if (status.next === null || status.xpRemaining > 0 || status.remainingMs > 0 || status.careDays < status.days || updated.health.sickSince) return updated;
   const nextLevel = updated.level + 1;
   // One transition only. The next stage's elapsed time starts right now.
-  return { ...updated, level: nextLevel, lastCareAt: new Date(now).toISOString(), growth: {
+  return { ...updated, level: nextLevel, lastCareAt: new Date(now).toISOString(), health: { ...updated.health, carePausedMs: 0 }, growth: {
     ...updated.growth,
     enteredAt: new Date(now).toISOString(),
+    pausedMs: 0,
     careDates: { ...updated.growth.careDates, [nextLevel]: (cared || updated.growth.careDates[updated.level].includes(today) || (updated.daily?.date === today && (updated.daily.careDone || updated.daily.careActions.length > 0))) ? [today] : [] },
   } };
 }
@@ -55,7 +58,7 @@ export function refreshGrowth(state, now = Date.now()) {
   return pet === state.pet ? state : { ...state, pet };
 }
 export function answerQuiz(state, answer) {
-  if (!state.quiz || state.quiz.answered || !state.quiz.question.options.includes(answer)) return state;
+  if (isOnVacation(state.pet) || !state.quiz || state.quiz.answered || !state.quiz.question.options.includes(answer)) return state;
   const correct = isCorrect(state.quiz.question, answer);
   const totalXp = correct ? Math.min(Number.MAX_SAFE_INTEGER, state.pet.totalXp + 10) : Math.max(0, state.pet.totalXp - WRONG_ANSWER_PENALTY);
   const pet = { ...state.pet, totalXp, ...(correct ? { [state.quiz.action]: clamp(state.pet[state.quiz.action] + 15) } : {}) };
@@ -67,7 +70,7 @@ export const ROOM_MESS_FEEDS = 2;
 export const newRoom = () => ({ feedings: 0 });
 export const isRoomMessy = pet => pet.room.feedings >= ROOM_MESS_FEEDS;
 export function applyRoomCare(pet, action, correct) {
-  if (!correct) return pet;
+  if (!correct || isOnVacation(pet)) return pet;
   if (action === 'cleanliness' && pet.room.feedings !== 0) return { ...pet, room: newRoom() };
   if (action === 'hunger' && pet.room.feedings < ROOM_MESS_FEEDS) {
     return { ...pet, room: { feedings: pet.room.feedings + 1 } };
