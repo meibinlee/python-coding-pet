@@ -23,7 +23,7 @@ export default function App() {
   const trigger = useRef(null);
   const submitting = useRef(false);
   const memoryOnly = useRef(false);
-  const stage = growth(state.pet.totalXp);
+  const stage = growth(state.pet.totalXp, state.pet.level);
   const daily = currentDaily(state.pet, now);
 
   useEffect(() => {
@@ -146,7 +146,7 @@ export default function App() {
           <div className="xp">
             <span>성장 경험치</span>
             <strong>{state.pet.totalXp} <small>{stage.next ? `/ ${stage.next} XP` : 'XP · 최고 단계'}</small></strong>
-            <progress aria-label="성장 경험치" max={stage.next ? stage.next - stage.start : 1} value={stage.next ? state.pet.totalXp - stage.start : 1} />
+            <progress aria-label="성장 경험치" max={stage.next ? stage.next - stage.start : 1} value={stage.next ? Math.max(0, state.pet.totalXp - stage.start) : 1} />
           </div>
         </div>
         <Pet pet={state.pet} stage={stage} limitReached={daily.count >= DAILY_LIMIT} />
@@ -154,7 +154,7 @@ export default function App() {
         <StatusBars pet={state.pet} />
         <div className="daily-summary" role="status">
           <strong>오늘 {daily.count} / {DAILY_LIMIT}문제 · 남은 문제 {DAILY_LIMIT - daily.count}개</strong>
-          <p>{daily.count >= DAILY_LIMIT ? '오늘의 복습을 마쳤어요! 한국 시간 자정부터 다시 풀 수 있어요.' : '정답과 오답 모두 1문제를 사용해요. 한국 시간 자정에 새로 시작해요.'}</p>
+          <p>{daily.count >= DAILY_LIMIT ? '오늘의 복습을 마쳤어요! 한국 시간 자정부터 다시 풀 수 있어요.' : '정답 XP +10 · 오답 XP −5 (최저 0). 정답·오답 모두 1문제를 사용해요. 한국 시간 자정에 새로 시작해요.'}</p>
         </div>
         <div className="actions">
           {Object.entries(actions).map(([action, label], index) => <button
@@ -166,7 +166,7 @@ export default function App() {
           <button onClick={() => performUpdate(options => updateStored(state, basicCare, options), '오늘도 곁에서 돌봐 줬어요!')} disabled={pending || daily.careDone}>
             {daily.careDone ? '✓ 오늘 기본 돌봄 완료' : '♡ 기본 돌봄 하기'}
           </button>
-          <p>하루 한 번, 문제를 풀지 않아도 돌볼 수 있어요.<br />XP와 상태 수치는 바뀌지 않아요.</p>
+          <p>하루 한 번, 문제를 풀지 않아도 돌볼 수 있어요.<br />XP와 상태 수치는 바뀌지 않아요.<br />오늘 함께한 돌봄을 기록해요.</p>
         </div>
         <ul className="care-checklist" aria-label="오늘의 돌봄 체크리스트">
           {Object.entries(actions).map(([action, label]) => <li key={action}>{daily.careActions.includes(action) ? '✓ 완료' : '○ 아직'} · {label}</li>)}

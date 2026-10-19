@@ -1,3 +1,4 @@
+import { growth } from './rules.js';
 import { emptyDaily, koreanDate } from './time.js';
 
 export const SAVE_KEY = 'coding-pet-save-v1';
@@ -8,6 +9,7 @@ export const defaultPet = (now = Date.now()) => ({
   cleanliness: 70,
   affection: 70,
   totalXp: 0,
+  level: 1,
   lastUpdatedAt: new Date(now).toISOString(),
   daily: emptyDaily(now),
   lastCareAt: new Date(now).toISOString(),
@@ -35,7 +37,8 @@ export function validateSave(data, now = Date.now()) {
 
   // Extend v1 in place: keep the existing key, names, stats, XP and growth stage.
   const pet = Object.fromEntries(Object.keys(defaultPet(now))
-    .filter(key => !['daily', 'lastCareAt'].includes(key)).map(key => [key, data[key]]));
+    .filter(key => !['daily', 'lastCareAt', 'level'].includes(key)).map(key => [key, data[key]]));
+  pet.level = growth(data.totalXp, [1,2,3].includes(data.level) ? data.level : 1).level;
   const daily = data.daily;
   pet.daily = validDaily(daily) && daily.date === koreanDate(now)
     ? {
