@@ -16,9 +16,9 @@ export function validateSave(data, now = Date.now()) {
     : emptyDaily(now);
   return pet;
 }
-export function loadPet(storage) {
-  try { const raw=(storage ?? globalThis.localStorage).getItem(SAVE_KEY); if(raw===null)return {pet:defaultPet(),isNew:true,error:''}; const pet=validateSave(JSON.parse(raw)); return pet?{pet,isNew:false,error:''}:{pet:defaultPet(),isNew:true,error:'저장 기록을 읽을 수 없어 기본 상태로 복구했어요.'}; }
-  catch { return {pet:defaultPet(),isNew:true,error:'저장소를 사용할 수 없거나 기록이 손상되었어요. 현재 게임은 계속할 수 있어요.'}; }
+export function loadPet(storage, now = Date.now()) {
+  try { const raw=(storage ?? globalThis.localStorage).getItem(SAVE_KEY); if(raw===null)return {pet:defaultPet(now),isNew:true,error:''}; const pet=validateSave(JSON.parse(raw), now); return pet?{pet,isNew:false,error:''}:{pet:defaultPet(now),isNew:true,error:'저장 기록을 읽을 수 없어 기본 상태로 복구했어요.'}; }
+  catch { return {pet:defaultPet(now),isNew:true,error:'저장소를 사용할 수 없거나 기록이 손상되었어요. 현재 게임은 계속할 수 있어요.'}; }
 }
 export function savePet(pet,storage) { try{(storage ?? globalThis.localStorage).setItem(SAVE_KEY,JSON.stringify({...pet,lastUpdatedAt:new Date().toISOString()}));return true;}catch{return false;} }
 export function resetPet(storage) {try{(storage ?? globalThis.localStorage).removeItem(SAVE_KEY);return true;}catch{return false;} }
