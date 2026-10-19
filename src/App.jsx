@@ -198,7 +198,7 @@ export default function App() {
 
   return <div className="app">
     <header>
-      <a href="./" className="brand"><img className="brand-icon" src={`${import.meta.env.BASE_URL}favicon.svg`} width="38" height="38" alt="" /> 코딩 펫 <span className="brand-sub">작은 도전, 함께 자라는 하루</span></a>
+      <a href="./" className="brand"><img className="brand-icon" src={`${import.meta.env.BASE_URL}favicon.svg?v=rabbit1`} width="38" height="38" alt="" /> 코딩 펫 <span className="brand-sub">작은 도전, 함께 자라는 하루</span></a>
       <button className="reset" disabled={pending} onClick={reset}>↻ 초기화</button>
     </header>
     <main>
