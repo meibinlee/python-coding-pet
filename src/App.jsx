@@ -1,3 +1,4 @@
+import { maintenanceRemaining } from './game/maintenance.js';
 import { useEffect, useRef, useState } from 'react';
 import Pet from './components/Pet.jsx';
 import StatusBars from './components/StatusBars.jsx';
@@ -230,7 +231,7 @@ export default function App() {
         </div>
         <section className={`vacation-panel${onVacation ? ' on-vacation' : ''}`} aria-label="휴가 모드">
           <div><h3>{onVacation ? '☀ 함께 쉬는 휴가 중이에요' : '잠깐 쉬어 가고 싶나요?'}</h3>
-            <p id="vacation-note">{onVacation ? '질병·성장·회복 시간이 멈췄어요. 문제 풀이와 돌봄은 휴가를 마친 뒤 이어가요. 쓰다듬기는 언제든 가능해요.' : '여행이나 주말에는 휴가 모드로 질병·성장·회복 시간을 함께 멈출 수 있어요.'}</p>
+            <p id="vacation-note">{onVacation ? '질병·성장·회복·XP 감소 시간이 멈췄어요. 문제 풀이와 돌봄은 휴가를 마친 뒤 이어가요. 쓰다듬기는 언제든 가능해요.' : '여행이나 주말에는 휴가 모드로 질병·성장·회복·XP 감소 시간을 함께 멈출 수 있어요.'}</p>
             {onVacation && <p>일일 문제 수는 한국 날짜를 따르며 이월되지 않아요. 낮잠은 원래 종료 시각에 끝나요.</p>}
           </div>
           <button disabled={pending} aria-pressed={onVacation} onClick={() => performUpdate(
@@ -269,6 +270,13 @@ export default function App() {
             <li>{growthProgress.careDays >= stage.days ? '✓ 달성' : '○ 더 필요해요'} · 돌본 날짜 {Math.min(growthProgress.careDays,stage.days)} / {stage.days}일</li>
           </ul>
           <p>{onVacation ? '휴가 중에는 성장 시간과 돌본 날짜가 쌓이지 않아요. ' : ''}{health.sick ? '아픈 동안은 성장 대기 중이에요. 회복 후 조건을 다시 확인해요. ' : ''}세 조건을 모두 채우면 성장해요. 정답 돌봄 또는 기본 돌봄으로 하루를 기록해요. 오답·쓰다듬기는 돌본 날짜에 포함되지 않아요.</p>
+        </section>}
+        {stage.next && <section className="growth-details" aria-label="주기적인 돌봄">
+          <h3>4시간마다 함께 돌봐요</h3>
+          <p>먹이·청소·놀이를 각각 4시간 동안 하지 않으면 해당 행동마다 성장 XP가 1씩 줄어요. 정답을 맞히면 그 행동의 관리 시간이 새로 시작돼요.</p>
+          <ul>{Object.entries(actions).map(([action,label]) => <li key={action}>{label} · 다음 감소까지 {formatWait(maintenanceRemaining(state.pet,action,now))}</li>)}</ul>
+          <p>{onVacation ? '휴가 중에는 XP 감소 시간도 멈춰요.' : '접속하지 않은 시간과 낮잠 시간도 포함돼요. 오래 쉬려면 휴가를 시작해 주세요.'} XP는 최저 0이며 성장 단계는 내려가지 않아요. 성체가 되면 주기적인 XP 감소가 끝나요.</p>
+          <p>기본 돌봄·간호·쓰다듬기는 이 시간을 초기화하지 않아요. 하루 문제 한도 내에서 돌봐 주세요.</p>
         </section>}
         <StatusBars pet={state.pet} />
         <div className="daily-summary" role="status">

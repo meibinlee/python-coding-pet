@@ -1,3 +1,4 @@
+import { refreshMaintenance, recordMaintenance } from './maintenance.js';
 import { answerQuiz, advanceGrowth, applyRoomCare, refreshGrowth } from './rules.js';
 import { refreshHealth, healthStatus, performCare } from './health.js';
 import { startNap, refreshSleep } from './sleep.js';
@@ -11,7 +12,7 @@ export function submitDaily(state, answer, now = Date.now()) {
   if (isOnVacation(state.pet) || !quiz || quiz.answered || !quiz.question.options.includes(answer)) return state;
   const daily = currentDaily(state.pet, now);
   if (daily.count >= DAILY_LIMIT || daily.submittedIds.includes(quiz.question.instanceId)) return state;
-  const result = answerQuiz({...state,pet:refreshHealth(state.pet,now)}, answer);
+  const result = answerQuiz({...state,pet:refreshHealth(refreshMaintenance(state.pet,now),now)}, answer);
   const pet = {...result.pet,
     health: result.quiz.correct ? { ...result.pet.health, carePausedMs: 0 } : result.pet.health,
     lastCareAt: result.quiz.correct ? new Date(now).toISOString() : result.pet.lastCareAt,
@@ -22,14 +23,15 @@ export function submitDaily(state, answer, now = Date.now()) {
       careActions: result.quiz.correct ? [...new Set([...daily.careActions,quiz.action])] : daily.careActions,
     },
   };
-  const grown = advanceGrowth(refreshHealth(pet,now),now,result.quiz.correct);
+  const maintained = result.quiz.correct ? recordMaintenance(pet,quiz.action,now) : pet;
+  const grown = advanceGrowth(refreshHealth(maintained,now),now,result.quiz.correct);
   return {...result,pet:applyRoomCare(startNap(state.pet,grown,quiz.action,result.quiz.correct,now),quiz.action,result.quiz.correct)};
 }
 
 export function basicCare(state, now = Date.now()) {
   const daily = currentDaily(state.pet, now);
   if (!healthStatus(state.pet,now).canCare) return state;
-  const cared = refreshSleep(performCare(state.pet,now),now);
+  const cared = refreshSleep(performCare(refreshMaintenance(state.pet,now),now),now);
   return {...state,pet:advanceGrowth({...cared,daily:{...daily,careDone:true,nursingDone:daily.nursingDone||Boolean(refreshHealth(state.pet,now).health.sickSince)}},now,true)};
 }
 

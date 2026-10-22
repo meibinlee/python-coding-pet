@@ -65,7 +65,7 @@ it('blocks correct and wrong submissions, normal care and nursing without consum
   expect(answerQuiz(open,'4')).toBe(open);
   expect(basicCare(paused,start+2*DAY_MS)).toBe(paused);
   expect(healthStatus(paused.pet,start+2*DAY_MS).canCare).toBe(false);
-  expect(paused.pet.totalXp).toBe(170);
+  expect(paused.pet.totalXp).toBe(152);
 });
 it('keeps daily limits on real Korean dates with no saved-up unused questions',()=>{
   const pet=baby();pet.daily={...pet.daily,count:10,submittedIds:Array.from({length:10},(_,i)=>`old-${i}`)};

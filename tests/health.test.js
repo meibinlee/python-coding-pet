@@ -16,7 +16,7 @@ it('eggs never get sick, while baby illness begins strictly after 24 hours',()=>
   expect(refreshHealth({...baby(),level:3},start+DAY_MS+1).health.sickSince).toBeTruthy();
 });
 it('protects a newly hatched baby and does not stack illness over a long absence',()=>{
-  const pet={...defaultPet(start),totalXp:100};pet.growth.careDates[1]=[koreanDate(start),koreanDate(start+DAY_MS)];
+  const pet={...defaultPet(start),totalXp:1000};pet.growth.careDates[1]=[koreanDate(start),koreanDate(start+DAY_MS)];
   const now=start+30*DAY_MS,born=refreshGrowth({pet,quiz:null},now).pet;
   expect(born.level).toBe(2);expect(refreshHealth(born,now).health.sickSince).toBeNull();
   const sick=refreshHealth(baby(),now);
@@ -29,12 +29,12 @@ it('detects overdue illness before correct care and keeps nursing necessary',()=
   expect(result.pet.health.sickSince).toBeTruthy();
   expect(result.pet.health.recoveryStartedAt).toBeNull();
   expect(result.pet.lastCareAt).toBe(new Date(now).toISOString());
-  expect(result.pet.totalXp).toBe(180);
+  expect(result.pet.totalXp).toBe(162);
 });
-it('normal care prevents illness without XP, state or question count changes',()=>{
+it('normal care prevents illness without rewards while settling overdue maintenance',()=>{
   const now=start+DAY_MS-1;
   const result=basicCare({pet:baby(),quiz:null},now);
-  expect(result.pet).toMatchObject({hunger:70,cleanliness:70,affection:70,totalXp:170,daily:{count:0,careDone:true,nursingDone:false}});
+  expect(result.pet).toMatchObject({hunger:70,cleanliness:70,affection:70,totalXp:155,daily:{count:0,careDone:true,nursingDone:false}});
   expect(refreshHealth(result.pet,now+DAY_MS).health.sickSince).toBeNull();
   expect(refreshHealth(result.pet,now+DAY_MS+1).health.sickSince).toBeTruthy();
 });
@@ -61,7 +61,7 @@ it('waiting 24 hours alone is insufficient, later-day nursing completes recovery
   expect(refreshHealth(pet,now+DAY_MS).health.sickSince).toBeTruthy();
   const healed=basicCare({pet,quiz:null},now+DAY_MS).pet;
   expect(healed.health.sickSince).toBeNull();
-  expect(healed.totalXp).toBe(170);
+  expect(healed.totalXp).toBe(134);
   expect(healthStatus(healed,now+DAY_MS).canCare).toBe(false);
 });
 it('permits one first-nursing exception after today’s care is already used',()=>{
@@ -73,11 +73,11 @@ it('permits one first-nursing exception after today’s care is already used',()
   expect(basicCare(first,now+1)).toBe(first);
 });
 it('sick pets can learn and receive rewards but growth waits for recovery',()=>{
-  const now=start+4*DAY_MS,pet=refreshHealth(baby(),now);
+  const now=start+4*DAY_MS,pet=refreshHealth({...baby(),totalXp:300},now);
   pet.growth.careDates[2]=Array.from({length:4},(_,i)=>koreanDate(start+i*DAY_MS));
   expect(advanceGrowth(pet,now).level).toBe(2);
   const rewarded=submitDaily(quiz(pet),'4',now).pet;
-  expect(rewarded.totalXp).toBe(180);expect(rewarded.hunger).toBe(85);expect(rewarded.level).toBe(2);
+  expect(rewarded.totalXp).toBe(238);expect(rewarded.hunger).toBe(85);expect(rewarded.level).toBe(2);
   const first=basicCare({pet:rewarded,quiz:null},now);
   const healed=basicCare(first,now+DAY_MS).pet;
   expect(healed.health.sickSince).toBeNull();expect(healed.level).toBe(3);
@@ -86,7 +86,7 @@ it('nursing remains available after all ten wrong submissions',()=>{
   const now=start+DAY_MS+1;let pet=baby();
   for(let i=0;i<10;i++)pet=submitDaily(quiz(pet,`wrong-${i}`),'5',now).pet;
   const cared=basicCare({pet,quiz:null},now).pet;
-  expect(cared.daily.count).toBe(10);expect(cared.totalXp).toBe(120);
+  expect(cared.daily.count).toBe(10);expect(cared.totalXp).toBe(102);
   expect(cared.health.recoveryStartedAt).toBeTruthy();
 });
 it('does not re-infect immediately when a wrong answer coincides with timed recovery',()=>{
@@ -104,7 +104,7 @@ it('persists nursing across reloads and prevents duplicate nursing across stale 
   expect(loadPet(storage,now+1).pet.health.recoveryStartedAt).toBe(new Date(now).toISOString());
 });
 it('starts a new health baseline for old saves while preserving existing growth and XP',async()=>{
-  const now=start+10*DAY_MS,storage=memory(),old=baby();delete old.health;
+  const now=start+10*DAY_MS,storage=memory(),old=baby();delete old.health;delete old.maintenance;
   storage.setItem(SAVE_KEY,JSON.stringify(old));
   const loaded=loadPet(storage,now);
   expect(loaded.migrated).toBe(true);expect(loaded.pet.growth).toEqual(old.growth);
@@ -129,7 +129,7 @@ it('persists automatic recovery after an early follow-up without extra rewards o
   const state={pet,quiz:null},now=first+DAY_MS;
   const result=await updateStored(state,refreshGrowth,{storage,locks:null,now});
   const restored=loadPet(storage,now).pet;
-  expect(restored.health.sickSince).toBeNull();expect(restored.totalXp).toBe(pet.totalXp);
+  expect(restored.health.sickSince).toBeNull();expect(restored.totalXp).toBe(pet.totalXp-18);
   expect(restored.growth.careDates).toEqual(pet.growth.careDates);
   expect(restored.lastCareAt).toBe(new Date(now).toISOString());
   expect(result.saved).toBe(true);

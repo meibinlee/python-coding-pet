@@ -5,13 +5,15 @@ export const characters = [
     "name": "치이카와",
     "images": {
       "egg": {
-        "normal": "egg-normal.png"
+        "normal": "egg-normal.png",
+        "sleep": "egg-sleep.png"
       },
       "baby": {
         "happy": "baby-happy.png",
         "play": "baby-play.png",
         "clean": "baby-clean.png",
         "normal": "baby-normal.png",
+        "sleep": "baby-sleep.png",
         "hungry": "baby-hungry.png"
       },
       "adult": {
@@ -29,11 +31,13 @@ export const characters = [
     "name": "하치와레",
     "images": {
       "egg": {
-        "normal": "egg-normal.png"
+        "normal": "egg-normal.png",
+        "sleep": "egg-sleep.png"
       },
       "baby": {
         "play": "baby-play.png",
         "normal": "baby-normal.png",
+        "sleep": "baby-sleep.png",
         "clean": "baby-clean.png",
         "hungry": "baby-hungry.png",
         "happy": "baby-happy.png"
@@ -53,11 +57,13 @@ export const characters = [
     "name": "우사기",
     "images": {
       "egg": {
-        "normal": "egg-normal.png"
+        "normal": "egg-normal.png",
+        "sleep": "egg-sleep.png"
       },
       "baby": {
         "play": "baby-play.png",
         "normal": "baby-normal.png",
+        "sleep": "baby-sleep.png",
         "hungry": "baby-hungry.png",
         "clean": "baby-clean.png",
         "happy": "baby-happy.png"
@@ -67,6 +73,7 @@ export const characters = [
         "play": "adult-play.png",
         "clean": "adult-clean.png",
         "normal": "adult-normal.png",
+        "sleep": "adult-sleep.png",
         "hungry": "adult-hungry.png"
       }
     }
