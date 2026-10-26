@@ -1,6 +1,6 @@
 import { newMaintenance, normalizeMaintenance } from './maintenance.js';
 import { growth, newGrowthRecord, newRoom, ROOM_MESS_FEEDS } from './rules.js';
-import { newHealth } from './health.js';
+import { newHealth, SICK_XP_GRACE_MS } from './health.js';
 import { NEED_KEYS, newNeeds, normalizeNeeds } from './needs.js';
 import { newMeal, normalizeMeal, newMood, normalizeMood } from './meal.js';
 import { newSleep, normalizeSleep, validSleep } from './sleep.js';
@@ -79,9 +79,12 @@ function normalizeHealth(record, level, now, lastCareAt) {
   const followUpAt = recoveryStartedAt && record.followUpAt ? safeTimestamp(record.followUpAt,now) : null;
   const validFollowUp = followUpAt && Date.parse(followUpAt) >= Date.parse(recoveryStartedAt) &&
     koreanDate(Date.parse(followUpAt)) !== koreanDate(Date.parse(recoveryStartedAt));
+  const penalty = typeof record.xpPenaltyAt === 'string' ? Date.parse(record.xpPenaltyAt) : NaN;
+  // Older or broken records count the long-illness days from now instead of charging past days.
+  const xpPenaltyAt = penalty >= Date.parse(sickSince) + SICK_XP_GRACE_MS && penalty <= now + SICK_XP_GRACE_MS ? penalty : now + SICK_XP_GRACE_MS;
   return { sickSince, recoveryStartedAt, followUpAt: validFollowUp ? followUpAt : null, carePausedMs,
     recoveryPausedMs: recoveryStartedAt ? pauseMs(record.recoveryPausedMs,now-Date.parse(recoveryStartedAt)) : 0,
-    cause: NEED_KEYS.includes(record.cause) ? record.cause : null };
+    cause: NEED_KEYS.includes(record.cause) ? record.cause : null, xpPenaltyAt: new Date(xpPenaltyAt).toISOString() };
 }
 
 function validRoom(record) {
@@ -145,7 +148,7 @@ export function loadPet(storage, now = Date.now()) {
     const changedGrowth = JSON.stringify(data.growth) !== JSON.stringify(pet.growth);
     const oldGrowth = data.growth && { startedAt:data.growth.startedAt, enteredAt:data.growth.enteredAt, pausedMs:data.growth.pausedMs ?? 0, careDates:data.growth.careDates };
     const correctedGrowth = data.schemaVersion === 2 && JSON.stringify(oldGrowth) !== JSON.stringify(pet.growth);
-    const oldHealth = data.health && { sickSince:data.health.sickSince,recoveryStartedAt:data.health.recoveryStartedAt,followUpAt:data.health.followUpAt,carePausedMs:data.health.carePausedMs ?? 0,recoveryPausedMs:data.health.recoveryPausedMs ?? 0,cause:data.health.cause ?? null };
+    const oldHealth = data.health && { sickSince:data.health.sickSince,recoveryStartedAt:data.health.recoveryStartedAt,followUpAt:data.health.followUpAt,carePausedMs:data.health.carePausedMs ?? 0,recoveryPausedMs:data.health.recoveryPausedMs ?? 0,cause:data.health.cause ?? null,xpPenaltyAt:data.health.xpPenaltyAt === undefined ? pet.health.xpPenaltyAt : data.health.xpPenaltyAt };
     const changedHealth = JSON.stringify(data.health) !== JSON.stringify(pet.health);
     const correctedHealth = data.health !== undefined && JSON.stringify(oldHealth) !== JSON.stringify(pet.health);
     const changedVacation = JSON.stringify(data.vacation) !== JSON.stringify(pet.vacation);

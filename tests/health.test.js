@@ -1,5 +1,6 @@
 import { it, expect } from 'vitest';
-import { refreshHealth, healthStatus } from '../src/game/health.js';
+import { refreshHealth, healthStatus, SICK_XP_LOSS } from '../src/game/health.js';
+import { resumeVacation } from '../src/game/vacation.js';
 import { refreshGrowth, advanceGrowth } from '../src/game/rules.js';
 import { basicCare, submitDaily, updateStored, setVacation } from '../src/game/daily.js';
 import { defaultPet, loadPet, savePet, validateSave, SAVE_KEY } from '../src/game/storage.js';
@@ -71,6 +72,46 @@ it('recovery needs nursing, 24 hours, another date and a refilled cause status',
 it('older illnesses without a cause recover without a status refill',()=>{
   const pet=baby({hunger:0});pet.health={...pet.health,sickSince:new Date(start).toISOString(),recoveryStartedAt:new Date(start).toISOString(),followUpAt:new Date(start+60000).toISOString(),cause:null};
   expect(refreshHealth({...pet,hunger:5},start+DAY_MS).health.sickSince).toBeNull();
+});
+it('an illness lasting 3 days costs XP once per day, including offline days, never below 0',()=>{
+  const pet=sick();
+  expect(refreshHealth(pet,start+3*DAY_MS-1)).toBe(pet);
+  const day3=refreshHealth(pet,start+3*DAY_MS);
+  expect(day3.totalXp).toBe(170-SICK_XP_LOSS);
+  expect(refreshHealth(day3,start+4*DAY_MS-1)).toBe(day3);
+  expect(refreshHealth(day3,start+4*DAY_MS).totalXp).toBe(170-2*SICK_XP_LOSS);
+  const offline=refreshHealth(pet,start+6*DAY_MS+1000);
+  expect(offline.totalXp).toBe(170-4*SICK_XP_LOSS);
+  expect(refreshHealth(offline,start+6*DAY_MS+2000)).toBe(offline);
+  expect(refreshHealth({...pet,totalXp:3},start+5*DAY_MS).totalXp).toBe(0);
+});
+it('stops the long-illness XP loss at recovery and restarts the countdown for a new illness',()=>{
+  const pet=sick(),iso=time=>new Date(time).toISOString();
+  pet.health={...pet.health,recoveryStartedAt:iso(start+2*DAY_MS-1000),followUpAt:iso(start+2*DAY_MS+60000)};
+  const healed=refreshHealth({...pet,hunger:30},start+10*DAY_MS);
+  expect(healed.health.sickSince).toBeNull();expect(healed.totalXp).toBe(170);
+  pet.health={...pet.health,recoveryStartedAt:iso(start+3*DAY_MS-1000)};
+  expect(refreshHealth({...pet,hunger:30},start+10*DAY_MS).totalXp).toBe(170-SICK_XP_LOSS);
+  const again=refreshHealth({...healed,hunger:0},start+11*DAY_MS);
+  expect(again.health.xpPenaltyAt).toBe(iso(start+14*DAY_MS));
+});
+it('vacation pauses the long-illness countdown',()=>{
+  const pet={...sick(),vacation:{startedAt:new Date(start+2*DAY_MS).toISOString()}};
+  expect(refreshHealth(pet,start+10*DAY_MS)).toBe(pet);
+  const resumed=resumeVacation(pet,start+12*DAY_MS);
+  expect(refreshHealth(resumed,start+13*DAY_MS-1).totalXp).toBe(170);
+  expect(refreshHealth(resumed,start+13*DAY_MS).totalXp).toBe(170-SICK_XP_LOSS);
+});
+it('older sick saves start the long-illness countdown at load without charging past days',()=>{
+  const now=start+10*DAY_MS,storage=memory(),pet=sick();delete pet.health.xpPenaltyAt;
+  storage.setItem(SAVE_KEY,JSON.stringify(pet));
+  const loaded=loadPet(storage,now);
+  expect(loaded.error).toBe('');expect(loaded.pet.health.xpPenaltyAt).toBe(new Date(now+3*DAY_MS).toISOString());
+  expect(refreshHealth(loaded.pet,now).totalXp).toBe(170);
+  savePet(loaded.pet,storage,now);
+  expect(loadPet(storage,now+DAY_MS).pet.health.xpPenaltyAt).toBe(loaded.pet.health.xpPenaltyAt);
+  const broken=loadPet({getItem:()=>JSON.stringify({...pet,health:{...pet.health,xpPenaltyAt:new Date(now+9*DAY_MS).toISOString()}})},now);
+  expect(broken.error).toBeTruthy();expect(broken.pet.health.xpPenaltyAt).toBe(new Date(now+3*DAY_MS).toISOString());
 });
 it('same-day repeat nursing cannot start or complete recovery twice',()=>{
   const pet=firstNursing(),state={pet,quiz:null};

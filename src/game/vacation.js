@@ -13,6 +13,7 @@ export function resumeVacation(pet, now = Date.now()) {
     health: { ...pet.health,
       carePausedMs: pet.level >= 2 ? (pet.health.carePausedMs ?? 0) + elapsed : 0,
       recoveryPausedMs: pet.health.recoveryStartedAt ? (pet.health.recoveryPausedMs ?? 0) + elapsed : 0,
+      xpPenaltyAt: pet.health.xpPenaltyAt ? new Date(Date.parse(pet.health.xpPenaltyAt) + elapsed).toISOString() : null,
     },
   };
 }
