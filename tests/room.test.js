@@ -29,7 +29,8 @@ it('clears mess and the feeding count only on a correct cleaning answer',()=>{
   const clean=submitDaily(quiz(pet,'cleanliness','clean'),'4',now).pet;
   expect(clean.room.feedings).toBe(0);expect(isRoomMessy(clean)).toBe(false);
   expect(clean.cleanliness).toBe(85);expect(clean.totalXp).toBe(30);
-  const fed=submitDaily(quiz(clean,'hunger','fed-again'),'4',now).pet;
+  // Two meals made the pet full; the next meal comes after the full time.
+  const fed=submitDaily(quiz(clean,'hunger','fed-again'),'4',now+3*60*60*1000).pet;
   expect(fed.room.feedings).toBe(1);expect(isRoomMessy(fed)).toBe(false);
 });
 it('does not remove mess on play, basic care or a passive visit',()=>{

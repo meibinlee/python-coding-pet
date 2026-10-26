@@ -49,7 +49,7 @@ it('persists sleep across reload and wakes at the exact deadline with no automat
   expect(refreshGrowth({pet:saved,quiz:null},now+NAP_MS+1000).pet.sleep.endsAt).toBeNull();
 });
 it('keeps illness and nursing independent from sleeping and waking',()=>{
-  const pet={...defaultPet(now),level:2,hunger:90,lastCareAt:new Date(now-DAY_MS-1).toISOString()};
+  const pet={...defaultPet(now),level:2,hunger:90,cleanliness:0};
   const sickNap=submitDaily(quiz(pet),'4',now).pet;
   expect(sickNap.health.sickSince).toBeTruthy();expect(sleepStatus(sickNap,now).sleeping).toBe(true);
   const nursed=basicCare({pet:sickNap,quiz:null},now+1000).pet;
@@ -95,9 +95,10 @@ it('can nap after another explicit feeding answer while full and awake, never fr
 });
 it('does not pause illness detection or recovery deadlines while asleep',()=>{
   const pet={...napping(),level:2};
-  pet.lastCareAt=new Date(now-DAY_MS+1000).toISOString();
+  pet.affection=0;
   const sick=refreshGrowth({pet,quiz:null},now+1001).pet;
   expect(sick.health.sickSince).toBeTruthy();expect(sleepStatus(sick,now+1001).sleeping).toBe(true);
+  pet.affection=70;
   pet.health={sickSince:new Date(now-2*DAY_MS).toISOString(),recoveryStartedAt:new Date(now-DAY_MS+1000).toISOString(),followUpAt:new Date(now-1000).toISOString()};
   const healed=refreshGrowth({pet,quiz:null},now+1000).pet;
   expect(healed.health.sickSince).toBeNull();expect(healed.sleep).toEqual(pet.sleep);

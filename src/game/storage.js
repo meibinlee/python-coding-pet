@@ -1,11 +1,14 @@
 import { newMaintenance, normalizeMaintenance } from './maintenance.js';
 import { growth, newGrowthRecord, newRoom, ROOM_MESS_FEEDS } from './rules.js';
 import { newHealth } from './health.js';
+import { NEED_KEYS, newNeeds, normalizeNeeds } from './needs.js';
+import { newMeal, normalizeMeal, newMood, normalizeMood } from './meal.js';
 import { newSleep, normalizeSleep, validSleep } from './sleep.js';
 import { newVacation, normalizeVacation } from './vacation.js';
 import { isCharacterId } from '../data/characters.js';
 import { newAlbum, normalizeAlbum } from './album.js';
 import { emptyDaily, koreanDate } from './time.js';
+import { newWardrobe, normalizeWardrobe } from './shop.js';
 
 export const DEFAULT_PET_NAME = '파이썬';
 export const SAVE_KEY = 'coding-pet-save-v1';
@@ -25,6 +28,10 @@ export const defaultPet = (now = Date.now()) => ({
   room: newRoom(),
   maintenance: newMaintenance(now),
   vacation: newVacation(),
+  wardrobe: newWardrobe(),
+  needs: newNeeds(now),
+  meal: newMeal(),
+  mood: newMood(),
   lastUpdatedAt: new Date(now).toISOString(),
   daily: emptyDaily(now),
   lastCareAt: new Date(now).toISOString(),
@@ -73,7 +80,8 @@ function normalizeHealth(record, level, now, lastCareAt) {
   const validFollowUp = followUpAt && Date.parse(followUpAt) >= Date.parse(recoveryStartedAt) &&
     koreanDate(Date.parse(followUpAt)) !== koreanDate(Date.parse(recoveryStartedAt));
   return { sickSince, recoveryStartedAt, followUpAt: validFollowUp ? followUpAt : null, carePausedMs,
-    recoveryPausedMs: recoveryStartedAt ? pauseMs(record.recoveryPausedMs,now-Date.parse(recoveryStartedAt)) : 0 };
+    recoveryPausedMs: recoveryStartedAt ? pauseMs(record.recoveryPausedMs,now-Date.parse(recoveryStartedAt)) : 0,
+    cause: NEED_KEYS.includes(record.cause) ? record.cause : null };
 }
 
 function validRoom(record) {
@@ -89,7 +97,7 @@ export function validateSave(data, now = Date.now()) {
 
   // Keep the existing storage key; migrate the payload without resetting the pet.
   const pet = Object.fromEntries(Object.keys(defaultPet(now))
-    .filter(key => !['daily', 'lastCareAt', 'level', 'growth', 'schemaVersion', 'health', 'sleep', 'room', 'vacation', 'characterId', 'album', 'maintenance'].includes(key)).map(key => [key, data[key]]));
+    .filter(key => !['daily', 'lastCareAt', 'level', 'growth', 'schemaVersion', 'health', 'sleep', 'room', 'vacation', 'characterId', 'album', 'maintenance', 'wardrobe', 'needs', 'meal', 'mood'].includes(key)).map(key => [key, data[key]]));
   pet.schemaVersion = 2;
   const savedLevel = [1,2,3].includes(data.level) ? data.level : 1;
   pet.level = data.schemaVersion === 1 ? Math.max(savedLevel,growth(data.totalXp).level) : savedLevel;
@@ -112,6 +120,10 @@ export function validateSave(data, now = Date.now()) {
   pet.room = validRoom(data.room) ? { feedings: data.room.feedings } : newRoom();
   pet.sleep = normalizeSleep(data.sleep,now);
   pet.vacation = normalizeVacation(data.vacation,now);
+  pet.wardrobe = normalizeWardrobe(data.wardrobe);
+  pet.needs = normalizeNeeds(data.needs,pet.vacation.startedAt ? Date.parse(pet.vacation.startedAt) : now);
+  pet.meal = normalizeMeal(data.meal,now);
+  pet.mood = normalizeMood(data.mood,now);
   pet.maintenance = normalizeMaintenance(data.maintenance,pet.vacation.startedAt ? Date.parse(pet.vacation.startedAt) : now);
   pet.health = normalizeHealth(data.health, pet.level, now, data.lastCareAt);
   pet.lastCareAt = data.schemaVersion === 1 || data.health === undefined ? new Date(now).toISOString() : safeTimestamp(data.lastCareAt, now);
@@ -132,7 +144,7 @@ export function loadPet(storage, now = Date.now()) {
     const changedGrowth = JSON.stringify(data.growth) !== JSON.stringify(pet.growth);
     const oldGrowth = data.growth && { startedAt:data.growth.startedAt, enteredAt:data.growth.enteredAt, pausedMs:data.growth.pausedMs ?? 0, careDates:data.growth.careDates };
     const correctedGrowth = data.schemaVersion === 2 && JSON.stringify(oldGrowth) !== JSON.stringify(pet.growth);
-    const oldHealth = data.health && { sickSince:data.health.sickSince,recoveryStartedAt:data.health.recoveryStartedAt,followUpAt:data.health.followUpAt,carePausedMs:data.health.carePausedMs ?? 0,recoveryPausedMs:data.health.recoveryPausedMs ?? 0 };
+    const oldHealth = data.health && { sickSince:data.health.sickSince,recoveryStartedAt:data.health.recoveryStartedAt,followUpAt:data.health.followUpAt,carePausedMs:data.health.carePausedMs ?? 0,recoveryPausedMs:data.health.recoveryPausedMs ?? 0,cause:data.health.cause ?? null };
     const changedHealth = JSON.stringify(data.health) !== JSON.stringify(pet.health);
     const correctedHealth = data.health !== undefined && JSON.stringify(oldHealth) !== JSON.stringify(pet.health);
     const changedVacation = JSON.stringify(data.vacation) !== JSON.stringify(pet.vacation);
@@ -148,10 +160,14 @@ export function loadPet(storage, now = Date.now()) {
       (entry.reachedAt !== null && (typeof entry.reachedAt !== 'string' || !Number.isFinite(Date.parse(entry.reachedAt)) || Date.parse(entry.reachedAt) > now))));
     const correctedCharacter = data.characterId !== undefined && data.characterId !== null && changedCharacter;
     const changedMaintenance = JSON.stringify(data.maintenance) !== JSON.stringify(pet.maintenance);
-    const corrected = (data.maintenance !== undefined && changedMaintenance) || correctedCharacter || invalidAlbum || correctedVacation || correctedRoom || correctedSleep || correctedGrowth || correctedHealth || (data.daily !== undefined && (!validDaily(data.daily) || data.daily.date > koreanDate(now))) ||
+    const changedWardrobe = JSON.stringify(data.wardrobe) !== JSON.stringify(pet.wardrobe);
+    // Expired meal/mood timers are normal, so they only trigger a quiet re-save.
+    const changedCare = ['needs','meal','mood'].some(key => JSON.stringify(data[key]) !== JSON.stringify(pet[key]));
+    const correctedNeeds = data.needs !== undefined && JSON.stringify(data.needs) !== JSON.stringify(pet.needs);
+    const corrected = correctedNeeds || (data.wardrobe !== undefined && changedWardrobe) || (data.maintenance !== undefined && changedMaintenance) || correctedCharacter || invalidAlbum || correctedVacation || correctedRoom || correctedSleep || correctedGrowth || correctedHealth || (data.daily !== undefined && (!validDaily(data.daily) || data.daily.date > koreanDate(now))) ||
       Date.parse(data.lastUpdatedAt) > now ||
       (data.lastCareAt !== undefined && (typeof data.lastCareAt !== 'string' || !Number.isFinite(Date.parse(data.lastCareAt)) || Date.parse(data.lastCareAt) > now));
-    return { pet, isNew: false, migrated: data.schemaVersion !== 2 || changedGrowth || changedHealth || changedVacation || changedSleep || changedRoom || changedCharacter || changedAlbum || changedMaintenance || corrected, error: corrected ? '날짜 또는 돌봄 기록이 올바르지 않아 보정했어요. 펫과 경험치는 유지했어요.' : '' };
+    return { pet, isNew: false, migrated: data.schemaVersion !== 2 || changedGrowth || changedHealth || changedVacation || changedSleep || changedRoom || changedCharacter || changedAlbum || changedMaintenance || changedWardrobe || changedCare || corrected, error: corrected ? '날짜 또는 돌봄 기록이 올바르지 않아 보정했어요. 펫과 경험치는 유지했어요.' : '' };
   } catch {
     return { pet: defaultPet(now), isNew: true, error: '저장소를 사용할 수 없거나 기록이 손상되었어요. 현재 게임은 계속할 수 있어요.' };
   }
@@ -174,4 +190,22 @@ export function resetPet(storage) {
 export function createPet(petName, characterId, now = Date.now()) {
   if (!isCharacterId(characterId)) throw new Error('친구를 선택해 주세요.');
   return { ...defaultPet(now), petName: petName.trim().slice(0,20) || DEFAULT_PET_NAME, characterId, album: newAlbum(characterId,now) };
+}
+
+// Raw saved payload for account sync; null when missing, unreadable or invalid.
+export function readSave(storage, now = Date.now()) {
+  try {
+    const raw = (storage ?? globalThis.localStorage).getItem(SAVE_KEY);
+    const data = raw === null ? null : JSON.parse(raw);
+    return data && validateSave(data, now) ? data : null;
+  } catch { return null; }
+}
+
+// Writes an account save as-is (keeping its timestamp) and reloads it through the normal migration path.
+export function importSave(data, storage, now = Date.now()) {
+  if (!validateSave(data, now)) return null;
+  try {
+    (storage ?? globalThis.localStorage).setItem(SAVE_KEY, JSON.stringify(data));
+  } catch { return { pet: validateSave(data, now), isNew: false, saved: false }; }
+  return { ...loadPet(storage, now), saved: true };
 }

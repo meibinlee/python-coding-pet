@@ -2,6 +2,8 @@ import { refreshMaintenance, recordMaintenance } from './maintenance.js';
 import { answerQuiz, advanceGrowth, applyRoomCare, refreshGrowth } from './rules.js';
 import { refreshHealth, healthStatus, performCare } from './health.js';
 import { startNap, refreshSleep } from './sleep.js';
+import { refreshNeeds } from './needs.js';
+import { recordMeal, startMood, isFull } from './meal.js';
 import { isOnVacation, resumeVacation } from './vacation.js';
 import { currentDaily } from './time.js';
 import { loadPet, savePet } from './storage.js';
@@ -12,7 +14,9 @@ export function submitDaily(state, answer, now = Date.now()) {
   if (isOnVacation(state.pet) || !quiz || quiz.answered || !quiz.question.options.includes(answer)) return state;
   const daily = currentDaily(state.pet, now);
   if (daily.count >= DAILY_LIMIT || daily.submittedIds.includes(quiz.question.instanceId)) return state;
-  const result = answerQuiz({...state,pet:refreshHealth(refreshMaintenance(state.pet,now),now)}, answer);
+  // A full pet cannot eat more, even from a quiz opened before it became full.
+  if (quiz.action === 'hunger' && isFull(state.pet,now)) return state;
+  const result = answerQuiz({...state,pet:refreshHealth(refreshNeeds(refreshMaintenance(state.pet,now),now),now)}, answer);
   const pet = {...result.pet,
     health: result.quiz.correct ? { ...result.pet.health, carePausedMs: 0 } : result.pet.health,
     lastCareAt: result.quiz.correct ? new Date(now).toISOString() : result.pet.lastCareAt,
@@ -23,7 +27,9 @@ export function submitDaily(state, answer, now = Date.now()) {
       careActions: result.quiz.correct ? [...new Set([...daily.careActions,quiz.action])] : daily.careActions,
     },
   };
-  const maintained = result.quiz.correct ? recordMaintenance(pet,quiz.action,now) : pet;
+  const correct = result.quiz.correct;
+  const cared = !correct ? pet : quiz.action === 'hunger' ? recordMeal(pet,now) : startMood(pet,quiz.action === 'cleanliness' ? 'clean' : 'play',now);
+  const maintained = correct ? recordMaintenance(cared,quiz.action,now) : cared;
   const grown = advanceGrowth(refreshHealth(maintained,now),now,result.quiz.correct);
   return {...result,pet:applyRoomCare(startNap(state.pet,grown,quiz.action,result.quiz.correct,now),quiz.action,result.quiz.correct)};
 }
@@ -31,7 +37,7 @@ export function submitDaily(state, answer, now = Date.now()) {
 export function basicCare(state, now = Date.now()) {
   const daily = currentDaily(state.pet, now);
   if (!healthStatus(state.pet,now).canCare) return state;
-  const cared = refreshSleep(performCare(refreshMaintenance(state.pet,now),now),now);
+  const cared = refreshSleep(performCare(refreshNeeds(refreshMaintenance(state.pet,now),now),now),now);
   return {...state,pet:advanceGrowth({...cared,daily:{...daily,careDone:true,nursingDone:daily.nursingDone||Boolean(refreshHealth(state.pet,now).health.sickSince)}},now,true)};
 }
 

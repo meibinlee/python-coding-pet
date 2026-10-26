@@ -1,4 +1,6 @@
 import { refreshMaintenance } from './maintenance.js';
+import { refreshNeeds } from './needs.js';
+import { refreshMeal } from './meal.js';
 import { recordStage } from './album.js';
 import { isCorrect } from './questions.js';
 import { refreshSleep } from './sleep.js';
@@ -56,7 +58,7 @@ export function advanceGrowth(pet, now = Date.now(), cared = false) {
   } };
 }
 export function refreshGrowth(state, now = Date.now()) {
-  const pet = advanceGrowth(refreshSleep(refreshHealth(refreshMaintenance(state.pet, now), now), now), now);
+  const pet = advanceGrowth(refreshMeal(refreshSleep(refreshHealth(refreshNeeds(refreshMaintenance(state.pet, now), now), now), now), now), now);
   return pet === state.pet ? state : { ...state, pet };
 }
 export function answerQuiz(state, answer) {

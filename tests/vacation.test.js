@@ -23,40 +23,6 @@ it('freezes growth remaining time without adding care dates and resumes at the e
   const grown=refreshGrowth(resumed,start+12*DAY_MS).pet;
   expect(grown.level).toBe(2);expect(grown.growth.pausedMs).toBe(0);
 });
-it('freezes healthy care time, including the exact 24-hour boundary',()=>{
-  const half=DAY_MS/2, paused=setVacation(state(baby()),true,start+half);
-  expect(healthStatus(paused.pet,start+20*DAY_MS).sick).toBe(false);
-  const resumed=setVacation(paused,false,start+10*DAY_MS+half);
-  expect(refreshHealth(resumed.pet,start+11*DAY_MS).health.sickSince).toBeNull();
-  expect(refreshHealth(resumed.pet,start+11*DAY_MS+1).health.sickSince).toBeTruthy();
-});
-it('detects existing illness before entering vacation and does not heal it by waiting',()=>{
-  const paused=setVacation(state(baby()),true,start+DAY_MS+1);
-  expect(paused.pet.health.sickSince).toBeTruthy();
-  const resumed=setVacation(paused,false,start+30*DAY_MS);
-  expect(resumed.pet.health.sickSince).toBe(paused.pet.health.sickSince);
-  expect(resumed.pet.health.recoveryStartedAt).toBeNull();
-});
-it('freezes active recovery even with an already recorded follow-up',()=>{
-  const first=start+DAY_MS+1;
-  let pet=basicCare(state(baby()),first).pet;
-  pet=basicCare(state(pet),first+3*60*60*1000).pet;
-  expect(pet.health.followUpAt).toBeTruthy();
-  const paused=setVacation(state(pet),true,first+DAY_MS/2);
-  expect(healthStatus(paused.pet,first+10*DAY_MS).remainingMs).toBe(DAY_MS/2);
-  const resumed=setVacation(paused,false,first+10*DAY_MS+DAY_MS/2);
-  expect(resumed.pet.health.sickSince).toBeTruthy();
-  expect(refreshGrowth(resumed,first+11*DAY_MS-1).pet.health.sickSince).toBeTruthy();
-  const healed=refreshGrowth(resumed,first+11*DAY_MS).pet;
-  expect(healed.health.sickSince).toBeNull();expect(healed.health.recoveryPausedMs).toBe(0);
-});
-it('still requires another date’s nursing after a vacation when no follow-up was recorded',()=>{
-  const first=start+DAY_MS+1,pet=basicCare(state(baby()),first).pet;
-  const paused=setVacation(state(pet),true,first+1000);
-  const resumed=setVacation(paused,false,first+10*DAY_MS+1000);
-  expect(refreshGrowth(resumed,first+11*DAY_MS).pet.health.sickSince).toBeTruthy();
-  expect(basicCare(resumed,first+11*DAY_MS).pet.health.sickSince).toBeNull();
-});
 it('blocks correct and wrong submissions, normal care and nursing without consuming counts or XP',()=>{
   const paused=setVacation(state(baby()),true,start+DAY_MS+1);
   const open=question(paused.pet);
@@ -154,25 +120,67 @@ it('retains a failed vacation save in memory and resumes without double-counting
   expect(resumed.saved).toBe(true);
   expect(loadPet(storage,start+DAY_MS).pet.growth.pausedMs).toBe(DAY_MS);
 });
+const H=60*60*1000;
+// Sick from low cleanliness, nursed at 21:00 KST, followed up after midnight, then cleaned to 80.
+function recovering(){
+  let pet=refreshHealth({...baby(),cleanliness:0},start);
+  pet=basicCare(state(pet),start).pet;
+  pet=basicCare(state(pet),start+3*H).pet;
+  return {...pet,cleanliness:80};
+}
+it('freezes status decay during vacation and makes the pet sick only after the remaining time',()=>{
+  const half=DAY_MS/2,paused=setVacation(state(baby()),true,start+half);
+  expect(paused.pet.hunger).toBe(58);
+  expect(healthStatus(paused.pet,start+20*DAY_MS).sick).toBe(false);
+  const off=start+10*DAY_MS+half,resumed=setVacation(paused,false,off);
+  expect(refreshGrowth(resumed,off+58*H-1).pet.health.sickSince).toBeNull();
+  const sick=refreshGrowth(resumed,off+58*H).pet;
+  expect(sick.health.cause).toBe('hunger');expect(sick.hunger).toBe(0);
+});
+it('detects existing illness before entering vacation and does not heal it by waiting',()=>{
+  const paused=setVacation(state({...baby(),hunger:0}),true,start);
+  expect(paused.pet.health.sickSince).toBeTruthy();
+  const resumed=setVacation(paused,false,start+30*DAY_MS);
+  expect(resumed.pet.health.sickSince).toBe(paused.pet.health.sickSince);
+  expect(resumed.pet.health.recoveryStartedAt).toBeNull();
+});
+it('freezes active recovery even with an already recorded follow-up',()=>{
+  const pet=recovering();
+  expect(pet.health.followUpAt).toBeTruthy();
+  const paused=setVacation(state(pet),true,start+DAY_MS/2);
+  expect(healthStatus(paused.pet,start+10*DAY_MS).remainingMs).toBe(DAY_MS/2);
+  const resumed=setVacation(paused,false,start+10*DAY_MS+DAY_MS/2);
+  expect(resumed.pet.health.sickSince).toBeTruthy();
+  expect(refreshGrowth(resumed,start+11*DAY_MS-1).pet.health.sickSince).toBeTruthy();
+  const healed=refreshGrowth(resumed,start+11*DAY_MS).pet;
+  expect(healed.health.sickSince).toBeNull();expect(healed.health.recoveryPausedMs).toBe(0);
+});
+it('still requires another date’s nursing after a vacation when no follow-up was recorded',()=>{
+  let pet=refreshHealth({...baby(),cleanliness:0},start);
+  pet={...basicCare(state(pet),start).pet,cleanliness:80};
+  const paused=setVacation(state(pet),true,start+1000);
+  const resumed=setVacation(paused,false,start+10*DAY_MS+1000);
+  expect(refreshGrowth(resumed,start+11*DAY_MS).pet.health.sickSince).toBeTruthy();
+  expect(basicCare(resumed,start+11*DAY_MS).pet.health.sickSince).toBeNull();
+});
 it('preserves recovery pause and the original nursing dates through a reload after resume',()=>{
-  const first=start+DAY_MS+1,storage=memory();
-  let pet=basicCare(state(baby()),first).pet;
-  pet=basicCare(state(pet),first+3*60*60*1000).pet;
-  const paused=setVacation(state(pet),true,first+DAY_MS/2);
-  const resumed=setVacation(paused,false,first+10*DAY_MS+DAY_MS/2);
-  savePet(resumed.pet,storage,first+10*DAY_MS+DAY_MS/2);
-  const restored=loadPet(storage,first+10*DAY_MS+DAY_MS/2);
+  const storage=memory(),pet=recovering();
+  const paused=setVacation(state(pet),true,start+DAY_MS/2);
+  const off=start+10*DAY_MS+DAY_MS/2,resumed=setVacation(paused,false,off);
+  savePet(resumed.pet,storage,off);
+  const restored=loadPet(storage,off);
   expect(restored.error).toBe('');
   expect(restored.pet.health.recoveryStartedAt).toBe(pet.health.recoveryStartedAt);
   expect(restored.pet.health.followUpAt).toBe(pet.health.followUpAt);
+  expect(restored.pet.health.cause).toBe('cleanliness');
   expect(restored.pet.health.recoveryPausedMs).toBe(10*DAY_MS);
-  expect(healthStatus(restored.pet,first+10*DAY_MS+DAY_MS/2).remainingMs).toBe(DAY_MS/2);
+  expect(healthStatus(restored.pet,off).remainingMs).toBe(DAY_MS/2);
 });
-it('a correct answer after vacation starts a fresh care clock without discarding growth pause time',()=>{
+it('a correct answer after vacation keeps the paused status timers and growth pause time',()=>{
   const paused=setVacation(state(baby()),true,start+1000);
-  const off=setVacation(paused,false,start+3*DAY_MS+1000);
-  const answer=submitDaily(question(off.pet),'4',start+3*DAY_MS+1000).pet;
-  expect(answer.health.carePausedMs).toBe(0);expect(answer.growth.pausedMs).toBe(3*DAY_MS);
-  expect(refreshHealth(answer,start+4*DAY_MS+1000).health.sickSince).toBeNull();
-  expect(refreshHealth(answer,start+4*DAY_MS+1001).health.sickSince).toBeTruthy();
+  const off=start+3*DAY_MS+1000,resumed=setVacation(paused,false,off);
+  const answer=submitDaily(question(resumed.pet),'4',off).pet;
+  expect(answer.hunger).toBe(85);expect(answer.growth.pausedMs).toBe(3*DAY_MS);
+  expect(refreshGrowth(state(answer),off+H-1001).pet.hunger).toBe(85);
+  expect(refreshGrowth(state(answer),off+H-1000).pet.hunger).toBe(84);
 });

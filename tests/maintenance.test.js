@@ -37,7 +37,7 @@ it('wrong answers and basic care do not reset action clocks',()=>{
   expect(cared.totalXp).toBe(97);expect(cared.maintenance).toEqual(newMaintenance(start+H));
 });
 it('does not exempt naps or illness, and never reduces an earned level',()=>{
-  const p={...pet(),level:2,sleep:{startedAt:new Date(start).toISOString(),endsAt:new Date(start+100000).toISOString()}};
+  const p={...pet(),level:2,hunger:5,sleep:{startedAt:new Date(start).toISOString(),endsAt:new Date(start+100000).toISOString()}};
   const result=refreshGrowth(state(p),start+10*H).pet;
   expect(result.totalXp).toBe(70);expect(result.level).toBe(2);expect(result.health.sickSince).toBeTruthy();
 });

@@ -80,6 +80,13 @@ export const characters = [
   }
 ];
 
+// Adult head-top and neck lines as a percentage of the 1254px sprite, for accessory overlays.
+export const accessoryAnchors = {
+  chiikawa: { headTop: 17, neck: 62 },
+  hachiware: { headTop: 26, neck: 62 },
+  usagi: { headTop: 30, neck: 69 },
+};
+
 export const isCharacterId = id => characters.some(character => character.id === id);
 export const characterFor = id => characters.find(character => character.id === id) ?? null;
 export function characterImage(id, level, mood = 'normal', base = './') {

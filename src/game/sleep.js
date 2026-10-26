@@ -1,3 +1,5 @@
+import { isFull } from './meal.js';
+
 export const NAP_MS = 10 * 60 * 1000;
 export const newSleep = () => ({ startedAt: null, endsAt: null });
 
@@ -27,4 +29,5 @@ export function startNap(before, after, action, correct, now = Date.now()) {
   return { ...after, sleep: { startedAt: new Date(now).toISOString(), endsAt: new Date(now + NAP_MS).toISOString() } };
 }
 
-export const isActionResting = (pet, action, now = Date.now()) => action === 'hunger' && sleepStatus(pet, now).sleeping;
+// Feeding rests while napping or full; cleaning and play stay available.
+export const isActionResting = (pet, action, now = Date.now()) => action === 'hunger' && (sleepStatus(pet, now).sleeping || isFull(pet, now));

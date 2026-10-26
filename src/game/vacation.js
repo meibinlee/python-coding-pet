@@ -8,6 +8,7 @@ export function resumeVacation(pet, now = Date.now()) {
   const elapsed = Math.max(0, now - Date.parse(pet.vacation.startedAt));
   return { ...pet, vacation: newVacation(),
     maintenance: pet.maintenance ? Object.fromEntries(Object.entries(pet.maintenance).map(([action, time]) => [action, time + elapsed])) : undefined,
+    needs: pet.needs ? Object.fromEntries(Object.entries(pet.needs).map(([key, time]) => [key, time + elapsed])) : undefined,
     growth: { ...pet.growth, pausedMs: (pet.growth.pausedMs ?? 0) + elapsed },
     health: { ...pet.health,
       carePausedMs: pet.level >= 2 ? (pet.health.carePausedMs ?? 0) + elapsed : 0,

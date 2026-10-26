@@ -15,7 +15,8 @@ it('counts wrong answers, locks re-clicks and rejects invalid options',()=>{
 });
 it('accepts the tenth answer and blocks the eleventh',()=>{
   let pet=defaultPet(now);
-  for(let i=0;i<10;i++)pet=submitDaily(state(pet,`q${i}`),'4',now).pet;
+  // Play answers: feeding would stop after two meals because the pet becomes full.
+  for(let i=0;i<10;i++)pet=submitDaily({...state(pet,`q${i}`),quiz:{...state(pet,`q${i}`).quiz,action:'affection'}},'4',now).pet;
   expect(pet.daily.count).toBe(10);expect(pet.totalXp).toBe(100);
   const last=state(pet,'eleven');expect(submitDaily(last,'4',now)).toBe(last);
 });
