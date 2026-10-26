@@ -29,3 +29,7 @@ export function currentDaily(pet, now = Date.now()) {
   const period = quizPeriod(now);
   return (pet.daily.period ?? period) === period ? pet.daily : { ...pet.daily, period, count: 0, submittedIds: [] };
 }
+export function formatWait(ms) {
+  const minutes = Math.ceil(ms / 60000);
+  return minutes >= 60 ? `${Math.floor(minutes / 60)}시간 ${minutes % 60}분` : `${minutes}분`;
+}

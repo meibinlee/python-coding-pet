@@ -1,10 +1,10 @@
 import { characters, characterImage } from '../data/characters.js';
 
-export default function CharacterSelector({ value, onChange, disabled = false }) {
+export default function CharacterSelector({ value, onChange, disabled = false, options = characters }) {
   return <fieldset className="character-selector" disabled={disabled}>
     <legend>함께 키울 친구를 선택해 주세요</legend>
-    <div className="character-options">
-      {characters.map(character => <label key={character.id} className={`character-option${value === character.id ? ' selected' : ''}`}>
+    <div className={`character-options count-${options.length}`}>
+      {options.map(character => <label key={character.id} className={`character-option${value === character.id ? ' selected' : ''}`}>
         <input type="radio" name="character" value={character.id} checked={value === character.id} onChange={() => onChange(character.id)} required />
         <img src={characterImage(character.id,2,'normal',import.meta.env.BASE_URL)} alt={`${character.name} 아기 모습`} width="110" height="110" />
         <strong>{character.name}</strong>

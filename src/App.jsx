@@ -7,9 +7,12 @@ import GrowthAlbum from './components/GrowthAlbum.jsx';
 import Shop from './components/Shop.jsx';
 import { GuideContent, GuideDialog, Tutorial } from './components/Guide.jsx';
 import { isFull, fullRemaining, activeMood } from './game/meal.js';
-import { trashCount, SICK_CAUSES, NEED_LABELS, RECOVER_NEED } from './game/needs.js';
+import { trashCount, SICK_CAUSES } from './game/needs.js';
 import AccountPanel from './components/AccountPanel.jsx';
-import { buyItem, equipItem } from './game/shop.js';
+import { buyItem, equipItem, itemFor } from './game/shop.js';
+import { FamilyMember, GraduationPanel, RestingGraduates, HealthDetails } from './components/Family.jsx';
+import { isFamily, familyPets, familyCanCare, graduate, updateMember } from './game/family.js';
+import { streakStatus } from './game/streak.js';
 import { resolveLogin, cloudChangedElsewhere, syncAction, readOwner, writeOwner, clearOwner, saveTime } from './game/account.js';
 import { cloudConfigured, cloudMessage, currentUser, signUp, signIn, signOut, fetchCloudSave, pushCloudSave, deleteCloudSave } from './game/cloud.js';
 import { characterImage, characterFor } from './data/characters.js';
@@ -20,7 +23,7 @@ import { actions, growth, growthStatus, refreshGrowth, isRoomMessy } from './gam
 import { sleepStatus, isActionResting } from './game/sleep.js';
 import { isOnVacation } from './game/vacation.js';
 import { healthStatus } from './game/health.js';
-import { currentDaily, nextQuizReset, nextResetLabel } from './game/time.js';
+import { currentDaily, nextQuizReset, nextResetLabel, formatWait } from './game/time.js';
 import { DAILY_LIMIT, submitStored, updateStored, basicCare, setVacation } from './game/daily.js';
 import { SAVE_KEY, loadPet, savePet, resetPet, defaultPet, createPet, DEFAULT_PET_NAME, readSave, importSave, validateSave } from './game/storage.js';
 
@@ -28,11 +31,6 @@ const SAVE_WARNING = '자동 저장에 실패했어요. 이 창을 닫으면 기
 const TUTORIAL_KEY = 'coding-pet-tutorial-v1';
 function tutorialSeen() {
   try { return localStorage.getItem(TUTORIAL_KEY) === '1'; } catch { return false; }
-}
-
-function formatWait(ms) {
-  const minutes = Math.ceil(ms / 60000);
-  return minutes >= 60 ? `${Math.floor(minutes / 60)}시간 ${minutes % 60}분` : `${minutes}분`;
 }
 
 export default function App() {
@@ -46,6 +44,7 @@ export default function App() {
   const [pending, setPending] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
+  const [memberIndex, setMemberIndex] = useState(0);
   const reactionTimer = useRef(null);
   const pendingReaction = useRef(null);
   const history = useRef([]);
@@ -72,8 +71,23 @@ export default function App() {
   const onVacation = isOnVacation(state.pet);
   const mood = activeMood(state.pet, now);
   const cleaning = mood === 'clean', playing = mood === 'play';
-  const full = isFull(state.pet, now);
-  const feedRest = full ? `이제 배불러요! ${formatWait(fullRemaining(state.pet, now))} 후 다시 밥을 먹일 수 있어요.` : '낮잠 중에는 밥을 쉬어요. 청소나 놀이를 선택해 주세요.';
+  const family = isFamily(state.pet);
+  const members = familyPets(state.pet);
+  const canCare = familyCanCare(state.pet, now);
+  const anySick = members.some(member => healthStatus(member, now).sick);
+  const streak = streakStatus(state.pet, now);
+  const shopIndex = Math.min(memberIndex, members.length - 1);
+  const shopPet = members[shopIndex];
+  // A family eats while anyone can, so feeding rests only when everyone is full or napping.
+  const full = members.every(member => isFull(member, now));
+  const fullWait = Math.min(...members.map(member => fullRemaining(member, now)));
+  const feedRest = full ? `${family ? '모두 ' : '이제 '}배불러요! ${formatWait(fullWait)} 후 다시 밥을 먹일 수 있어요.` : `${family ? '모두 쉬는' : '낮잠'} 중에는 밥을 쉬어요. 청소나 놀이를 선택해 주세요.`;
+  const resting = (action, time) => familyPets(state.pet).every(member => isActionResting(member, action, time));
+  const familyAt = useRef(state.pet.familyAt);
+  useEffect(() => {
+    if (state.pet.familyAt && !familyAt.current) setNotice('세 친구가 모두 자랐어요! 이제 다 함께 지내요. 정답 한 번에 모두를 돌볼 수 있어요.');
+    familyAt.current = state.pet.familyAt;
+  }, [state.pet.familyAt]);
 
   useEffect(() => {
     let timer;
@@ -298,13 +312,21 @@ export default function App() {
 
   function buy(item) {
     if (!window.confirm(`${item.name}을(를) ${item.price} XP로 구입할까요?\n구입하면 바로 입혀 줘요. 성장 단계는 그대로예요.`)) return;
-    performUpdate(options => updateStored(state, current => buyItem(current, item.id), options),
+    performUpdate(options => updateStored(state, current => updateMember(current, shopIndex, member => buyItem(member, item.id)), options),
       `${item.name}을(를) 구입해서 입혀 줬어요!`, 'XP가 부족하거나 이미 가진 물건이에요. 현재 상태를 확인해 주세요.');
   }
 
   function equip(slot, itemId) {
-    performUpdate(options => updateStored(state, current => equipItem(current, slot, itemId), options),
+    performUpdate(options => updateStored(state, current => updateMember(current, shopIndex, member => equipItem(member, slot, itemId)), options),
       itemId ? '새로 입혀 줬어요!' : '벗겨 줬어요.', '이미 바뀌었어요. 현재 상태를 확인해 주세요.');
+  }
+
+  function graduateTo(nextName, characterId) {
+    const next = characterFor(characterId);
+    if (!next || !window.confirm(`${state.pet.petName}이(가) 졸업하고 ${next.name}의 알을 새로 키울까요?\n졸업한 친구는 경험치와 꾸미기를 간직한 채 쉬면서 기다려요.\n새 친구는 경험치와 꾸미기를 처음부터 모아요. 연속 학습 한정품은 함께 써요.`)) return;
+    setMemberIndex(0);
+    performUpdate(options => updateStored(state, (current, time) => graduate(current, createPet(nextName, characterId, time), time), options),
+      `${state.pet.petName}이(가) 졸업했어요! 이제 새 친구 ${next.name}의 알과 함께해요.`, '아직 졸업할 수 없거나 이미 졸업했어요. 현재 상태를 확인해 주세요.');
   }
 
   async function performUpdate(update, successMessage = '', blockedMessage = '이미 처리한 행동이거나 지금 풀 수 있는 문제를 모두 풀었어요.') {
@@ -338,15 +360,18 @@ export default function App() {
   }
 
   async function answer(choice) {
-    const wasFull = isFull(state.pet, Date.now());
+    const allFull = pet => familyPets(pet).every(member => isFull(member, Date.now()));
+    const wasFull = allFull(state.pet), rewards = state.pet.streak.rewards;
     const result = await performUpdate(options => submitStored(state, choice, options));
     const quiz = result?.state.quiz;
     // The second meal fills the pet: show the result briefly, then close the quiz.
-    if (result && !result.blocked && quiz?.correct && quiz.action === 'hunger' && !wasFull && isFull(result.state.pet, Date.now())) {
-      if (result.saved) setNotice(`이제 배불러요! ${formatWait(fullRemaining(result.state.pet, Date.now()))} 후에 다시 밥을 먹일 수 있어요.`);
+    if (result && !result.blocked && quiz?.correct && quiz.action === 'hunger' && !wasFull && allFull(result.state.pet)) {
+      if (result.saved) setNotice(`${isFamily(result.state.pet) ? '모두 ' : '이제 '}배불러요! ${formatWait(Math.min(...familyPets(result.state.pet).map(member => fullRemaining(member, Date.now()))))} 후에 다시 밥을 먹일 수 있어요.`);
       clearTimeout(reactionTimer.current);
       reactionTimer.current = setTimeout(closeQuiz, 2000);
     }
+    const gained = result && !result.blocked && result.saved ? result.state.pet.streak.rewards.filter(id => !rewards.includes(id)) : [];
+    if (gained.length) setNotice(`🔥 연속 학습 ${result.state.pet.streak.count}일 달성! 한정품 ${gained.map(id => itemFor(id).name).join('·')}을(를) 받았어요.${result.state.pet.level < 3 ? ' 성체가 되면 입힐 수 있어요.' : ''}`);
   }
 
   function closeTutorial() {
@@ -373,7 +398,7 @@ export default function App() {
       setNotice('휴가를 마친 뒤 문제와 돌봄을 이어갈 수 있어요.');
       return;
     }
-    if (isActionResting(state.pet, action, time)) {
+    if (resting(action, time)) {
       setNotice(feedRest);
       return;
     }
@@ -456,7 +481,12 @@ export default function App() {
         <p>기존 XP {state.pet.totalXp}와 성장 단계·돌봄 기록을 그대로 유지해요.</p>
         <CharacterSelector value={character} onChange={setCharacter} disabled={pending} />
         <button className="primary" disabled={pending} onClick={() => performUpdate(options=>updateStored(state,current=>selectCharacter(current,character),options),'선택한 친구와 계속 함께해요!','다른 창에서 이미 친구를 선택했어요. 그 친구와 계속 함께해요.')}>이 친구와 계속하기</button>
-      </section> : <section className="card pet-card" aria-label="나의 펫">
+      </section> : <section className={`card pet-card${family ? ' family-card' : ''}`} aria-label={family ? '우리 가족' : '나의 펫'}>
+        {family ? <>
+          <div className="pet-heading"><div><span className="tag">우리 가족 · 성체 {members.length}마리</span><h2>{members.map(member => member.petName).join(' · ')}<span className="tiny-heart"> ♥</span></h2></div></div>
+          {onVacation && <ul className="pet-status" role="status"><li>☀ 휴가 중 · 모든 시간이 멈췄어요</li></ul>}
+          <div className="family-grid">{members.map(member => <FamilyMember key={member.characterId} pet={member} now={now} limitReached={daily.count >= DAILY_LIMIT} />)}</div>
+        </> : <>
         <div className="pet-heading">
           <div><span className="tag">Lv.{stage.level} · {stage.name}</span><h2>{state.pet.petName}<span className="tiny-heart"> ♥</span></h2></div>
           <div className="xp">
@@ -469,35 +499,29 @@ export default function App() {
         <ul className="pet-status" role="status">
           {onVacation && <li>☀ 휴가 중 · 모든 시간이 멈췄어요</li>}
           {nap.sleeping && <li id="sleep-note">☾ 낮잠 중 · 약 {formatWait(nap.remainingMs)} 뒤에 깨요</li>}
-          {full && <li id="full-note">🍙 이제 배불러요! {formatWait(fullRemaining(state.pet, now))} 후 다시 밥 먹이기</li>}
+          {full && <li id="full-note">🍙 이제 배불러요! {formatWait(fullWait)} 후 다시 밥 먹이기</li>}
           {trash > 0 && <li>🧹 주변에 쓰레기 {trash}개 · 청소하면 줄어요</li>}
           {isRoomMessy(state.pet) && <li>💩 치울 것이 생겼어요</li>}
           {cleaning && <li>✦ 깨끗하게 청소했어요</li>}
           {playing && <li>♥ 신나게 놀았어요</li>}
         </ul>
-        {health.sick && <section className="health-details is-sick" aria-label="건강과 회복 상태" role="status">
-          <h3>♡ {health.cause ? SICK_CAUSES[health.cause] : '조금 아파요'}</h3>
-          <ul>
-            <li>{health.recovering ? '✓' : '○'} 간호하기로 회복 시작</li>
-            {health.recovering && <li>{health.remainingMs > 0 ? `○ 회복까지 ${formatWait(health.remainingMs)}` : '✓ 24시간 지남'}</li>}
-            {health.recovering && <li>{health.needsFollowUp ? '○ 다른 날 한 번 더 간호' : '✓ 다른 날 간호 완료'}</li>}
-            {health.cause && <li>{health.needsRefill ? '○' : '✓'} {NEED_LABELS[health.cause]} {RECOVER_NEED} 이상 채우기 (지금 {state.pet[health.cause]})</li>}
-          </ul>
-        </section>}
+        {health.sick && <HealthDetails pet={state.pet} health={health} />}
         <StatusBars pet={state.pet} canSicken={stage.level >= 2} />
+        </>}
         <div className="daily-summary" role="status"><strong>지금 {daily.count} / {DAILY_LIMIT}문제</strong>{daily.count >= DAILY_LIMIT ? <span> · 오늘의 복습이 끝났어요! {nextResetLabel(now)}에 다시 만나요</span> : <span> · {nextResetLabel(now)}에 새로 충전</span>}</div>
+        <div className="streak-summary" role="status"><strong>🔥 연속 학습 {streak.count}일{streak.studiedToday ? ' · 오늘 ✓' : ''}</strong><span>최고 {streak.best}일 · {streak.next ? `${streak.daysToNext}일 더 하면 ${itemFor(streak.next.itemId).name}` : '한정품을 모두 모았어요'}</span></div>
         <div className="actions">
           {Object.entries(actions).map(([action, label], index) => {
-            const resting = isActionResting(state.pet, action, now);
+            const rest = resting(action, now);
             return <button
-              key={action} className={action} disabled={pending || onVacation || daily.count >= DAILY_LIMIT || resting} aria-describedby={resting ? (full ? 'full-note' : 'sleep-note') : undefined}
+              key={action} className={action} disabled={pending || onVacation || daily.count >= DAILY_LIMIT || rest} aria-describedby={rest && !family ? (full ? 'full-note' : 'sleep-note') : undefined}
               onClick={event => { trigger.current = event.currentTarget; openQuiz(action); }}
-            ><span>{['🍙', '🧹', '🧸'][index]}</span><strong>{label}</strong><small>{onVacation ? '휴가 중' : resting ? (full ? `배불러요 · ${formatWait(fullRemaining(state.pet, now))} 후` : '낮잠 중') : '정답이면 +15'}</small></button>;
+            ><span>{['🍙', '🧹', '🧸'][index]}</span><strong>{label}</strong><small>{onVacation ? '휴가 중' : rest ? (full ? `배불러요 · ${formatWait(fullWait)} 후` : family ? '모두 쉬는 중' : '낮잠 중') : family ? '모두 +15' : '정답이면 +15'}</small></button>;
           })}
         </div>
         <div className="care-panel">
-          <button onClick={() => performUpdate(options => updateStored(state, basicCare, options), health.sick ? '간호 기록을 남겼어요. 회복 조건을 확인해 주세요.' : '오늘도 곁에서 돌봐 줬어요!')} disabled={pending || !health.canCare}>
-            {onVacation ? '☀ 휴가 중에는 돌봄을 쉬어요' : !health.canCare ? (daily.nursingDone ? '✓ 오늘 간호 완료' : '✓ 오늘 기본 돌봄 완료') : health.sick ? '♡ 간호하기' : '♡ 기본 돌봄 하기'}
+          <button onClick={() => performUpdate(options => updateStored(state, basicCare, options), anySick ? '간호 기록을 남겼어요. 회복 조건을 확인해 주세요.' : family ? '오늘도 모두 곁에서 돌봐 줬어요!' : '오늘도 곁에서 돌봐 줬어요!')} disabled={pending || !canCare}>
+            {onVacation ? '☀ 휴가 중에는 돌봄을 쉬어요' : !canCare ? (daily.nursingDone ? '✓ 오늘 간호 완료' : '✓ 오늘 기본 돌봄 완료') : anySick ? '♡ 간호하기' : '♡ 기본 돌봄 하기'}
           </button>
           <ul className="care-checklist" aria-label="오늘의 돌봄 체크리스트">
             {Object.entries(actions).map(([action, label]) => <li key={action}>{daily.careActions.includes(action) ? '✓' : '○'} {label}</li>)}
@@ -513,6 +537,7 @@ export default function App() {
             <li>XP 감소까지 · {Object.entries(actions).map(([action,label]) => `${label.split(' ')[0]} ${formatWait(maintenanceRemaining(state.pet,action,now))}`).join(' · ')}</li>
           </ul>
         </details>}
+        {!family && <GraduationPanel key={state.pet.characterId} pet={state.pet} now={now} pending={pending || accountBusy} onGraduate={graduateTo} />}
         <section className={`vacation-panel${onVacation ? ' on-vacation' : ''}`} aria-label="휴가 모드">
           <p id="vacation-note">{onVacation ? '☀ 휴가 중이에요. 문제와 돌봄은 휴가를 마친 뒤 이어가요.' : '오래 비울 때는 휴가를 켜 두세요.'}</p>
           <button disabled={pending} aria-pressed={onVacation} onClick={() => performUpdate(
@@ -521,8 +546,12 @@ export default function App() {
             '이미 휴가 상태가 바뀌었어요. 현재 상태를 확인해 주세요.'
           )}>{onVacation ? '휴가 마치기' : '휴가 시작하기'}</button>
         </section>
-        <Shop pet={state.pet} pending={pending || accountBusy} onBuy={buy} onEquip={equip} />
-        <GrowthAlbum pet={state.pet} />
+        {family && <div className="member-picker" role="group" aria-label="꾸미기와 앨범을 볼 친구">
+          {members.map((member, index) => <button key={member.characterId} aria-pressed={index === shopIndex} onClick={() => setMemberIndex(index)}>{member.petName}</button>)}
+        </div>}
+        <Shop pet={shopPet} pending={pending || accountBusy} onBuy={buy} onEquip={equip} />
+        <GrowthAlbum pet={shopPet} />
+        <RestingGraduates pet={state.pet} />
       </section>}
       {notice && <p role="status" className="notice">{notice}</p>}
     </main>
@@ -532,7 +561,7 @@ export default function App() {
     </aside>
     </div>
     <footer>{account.user ? <>{account.user.username} 계정과 이 브라우저에 자동 저장돼요<br /></> : <>이 브라우저에 자동 저장돼요{account.status === 'off' ? '' : ' · 로그인하면 다른 기기에서도 이어서 키워요'}<br /></>}<span className="credit">by.meibinlee</span></footer>
-    {state.quiz && <QuizModal quiz={state.quiz} pending={pending} limitReached={daily.count >= DAILY_LIMIT} resetLabel={nextResetLabel(now)} sleepBlocked={isActionResting(state.pet,state.quiz.action,now)} restMessage={feedRest} vacationBlocked={onVacation}
+    {state.quiz && <QuizModal quiz={state.quiz} pending={pending} limitReached={daily.count >= DAILY_LIMIT} resetLabel={nextResetLabel(now)} sleepBlocked={resting(state.quiz.action,now)} restMessage={feedRest} vacationBlocked={onVacation} family={family}
       onAnswer={answer} onNext={() => openQuiz(state.quiz.action)} onClose={closeQuiz} />}
     {showGuide && <GuideDialog onClose={() => setShowGuide(false)} onTutorial={openTutorial} />}
     {showTutorial && !state.quiz && <Tutorial onClose={closeTutorial} />}

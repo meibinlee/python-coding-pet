@@ -1,6 +1,6 @@
 import { it, expect } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
-import { characters, characterImage, characterFor, petMood } from '../src/data/characters.js';
+import { characters, characterImage, characterFor, petMood, accessoryAnchor } from '../src/data/characters.js';
 import { createPet, defaultPet, savePet, loadPet, SAVE_KEY } from '../src/game/storage.js';
 import { selectCharacter } from '../src/game/album.js';
 import { updateStored } from '../src/game/daily.js';
@@ -71,5 +71,18 @@ it('provides a sleeping image for every character and growth stage',()=>{
   for(const character of characters)for(const [index,stage] of ['egg','baby','adult'].entries()){
     expect(character.images[stage].sleep).toBe(`${stage}-sleep.png`);
     expect(characterImage(character.id,index+1,'sleep')).toContain(`${stage}-sleep.png`);
+  }
+});
+it('fits accessories to each character and to poses that move the head or body',()=>{
+  const normal=accessoryAnchor('usagi','normal');
+  expect(normal).toMatchObject({headX:50,neckX:50,neck:69,capeX:50,capeTop:65,neckRot:0});
+  expect(accessoryAnchor('usagi','play')).toMatchObject({headX:45,neckX:43,capeX:43,clothesWidth:48,headWidth:48});
+  const sleep=accessoryAnchor('chiikawa','sleep');
+  expect(sleep).toMatchObject({headRot:-15,neckRot:-70,capeRot:0,capeTop:55});
+  expect(accessoryAnchor('chiikawa','unknown')).toEqual(accessoryAnchor('chiikawa','normal'));
+  expect(accessoryAnchor('nobody','normal')).toBeNull();
+  for(const id of ['chiikawa','hachiware','usagi'])for(const mood of ['normal','happy','hungry','play','clean','sleep']){
+    const a=accessoryAnchor(id,mood);
+    for(const key of ['headTop','headX','headWidth','neck','neckX','clothesWidth','capeX','capeTop','capeWidth'])expect(a[key]).toBeGreaterThan(0);
   }
 });

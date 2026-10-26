@@ -7,6 +7,7 @@ import { refreshSleep } from './sleep.js';
 import { refreshHealth } from './health.js';
 import { isOnVacation, vacationTime } from './vacation.js';
 import { DAY_MS, koreanDate } from './time.js';
+import { isFamily, reunite } from './family.js';
 
 export const actions = { hunger: '먹이 주기', cleanliness: '청소하기', affection: '놀아주기' };
 export const clamp = value => Math.max(0, Math.min(100, value));
@@ -50,15 +51,20 @@ export function advanceGrowth(pet, now = Date.now(), cared = false) {
   if (status.next === null || status.xpRemaining > 0 || status.remainingMs > 0 || status.careDays < status.days || updated.health.sickSince) return updated;
   const nextLevel = updated.level + 1;
   // One transition only. The next stage's elapsed time starts right now.
-  return { ...updated, level: nextLevel, album: recordStage(updated.album,nextLevel,updated.characterId,now), lastCareAt: new Date(now).toISOString(), health: { ...updated.health, carePausedMs: 0 }, growth: {
+  return reunite({ ...updated, level: nextLevel, album: recordStage(updated.album,nextLevel,updated.characterId,now), lastCareAt: new Date(now).toISOString(), health: { ...updated.health, carePausedMs: 0 }, growth: {
     ...updated.growth,
     enteredAt: new Date(now).toISOString(),
     pausedMs: 0,
     careDates: { ...updated.growth.careDates, [nextLevel]: (cared || updated.growth.careDates[updated.level].includes(today) || (updated.daily?.date === today && (updated.daily.careDone || updated.daily.careActions.length > 0))) ? [today] : [] },
-  } };
+  } }, now);
 }
+const refreshMember = (pet, now) => advanceGrowth(refreshMeal(refreshSleep(refreshHealth(refreshNeeds(refreshMaintenance(pet, now), now), now), now), now), now);
 export function refreshGrowth(state, now = Date.now()) {
-  const pet = advanceGrowth(refreshMeal(refreshSleep(refreshHealth(refreshNeeds(refreshMaintenance(state.pet, now), now), now), now), now), now);
+  let pet = refreshMember(state.pet, now);
+  if (isFamily(pet)) {
+    const graduates = pet.graduates.map(graduate => refreshMember(graduate, now));
+    if (graduates.some((graduate, i) => graduate !== pet.graduates[i])) pet = { ...pet, graduates };
+  }
   return pet === state.pet ? state : { ...state, pet };
 }
 export function answerQuiz(state, answer) {

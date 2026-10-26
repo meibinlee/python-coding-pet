@@ -89,6 +89,24 @@
 - 이미지: `public/pets/accessories/*.svg` 자체 제작. 성체 이미지 위에 캐릭터별 머리·목 기준선(`accessoryAnchors`)으로 겹쳐 표시한다. 망토는 몸 뒤에 놓는다.
 - 저장: `wardrobe: { owned, equipped: { clothes, headband } }`. 기존 저장에는 빈 옷장을 추가하고 잘못된 값은 보정한다.
 
+### 연속 학습 (v2)
+
+- 한국 날짜 기준 정답 1개 이상인 날을 학습일로 센다. 어제도 학습했으면 +1, 하루를 빠지면 1부터 다시 센다. 오답·기본 돌봄은 세지 않는다.
+- 휴가 중인 날은 끊기지도 늘지도 않는다. 휴가 시작 시 살아 있던 기록은 휴가를 마친 날 학습하면 이어진다(`resumeStreak`).
+- 보상: 연속 7일 새싹 머리띠, 14일 별 메달, 30일 무지개 망토. 판매하지 않는 한정품으로 각 1회만 지급하며, 받은 시점의 모든 펫과 이후 새 펫의 옷장에 들어간다. 착용은 성체부터.
+- 저장: `streak: { count, best, lastDate, rewards }`(학생 단위, 현재 펫에 저장). `src/game/streak.js`.
+
+### 졸업과 다음 세대 (v2)
+
+- 성체가 된 뒤 실제 3일(휴가 제외)이 지나고 아프지 않으면 졸업할 수 있다. 확인창을 거친다.
+- 졸업하면 아직 키우지 않은 캐릭터 중 하나를 골라 이름을 짓고 새 알(XP 0, 빈 옷장 + 연속 학습 한정품)을 키운다. 오늘의 문제 수·돌봄 기록·연속 학습은 학생 기록으로 이어진다.
+- 졸업생은 XP·꾸미기·앨범을 그대로 간직하고 휴가처럼 시간이 멈춘 채 `graduates`에 저장된다(`graduatedAt` 기록).
+- 세 번째 펫이 성체가 되는 순간 졸업생 두 마리가 깨어나 함께 지낸다(`familyAt`). 이후 졸업은 없다.
+- 함께 지낼 때: 정답 한 번에 세 마리 모두 해당 수치 +15·XP +10, 오답이면 모두 XP −5. 배부른 펫은 밥을 건너뛰며, 모두 배부르거나 쉬는 중일 때만 먹이를 쉰다. 수치 감소·질병·회복·오래 아픔 XP 감소는 펫마다 따로 계산한다.
+- 기본 돌봄·간호는 버튼 하나로 모두에게 적용하며 하루 횟수를 공유한다. 누구든 새로 아프면 첫 간호 1회를 추가 허용한다. 휴가도 모두 함께 시작·종료한다.
+- XP와 옷장은 펫마다 따로. 상점·앨범은 고른 친구 기준으로 표시하고 그 친구의 XP로 구입한다(`updateMember`).
+- 저장 검증: 졸업생은 최대 2마리, 성체, 서로 다른 캐릭터이며 현재 펫과도 달라야 한다. 잘못된 졸업생은 제외하고 안내한다. 함께 지내기 전 깨어 있는 졸업생은 다시 쉬게 하고, 조건이 맞지 않는 `familyAt`은 지운다. `src/game/family.js`, `src/components/Family.jsx`.
+
 ## 6. 로그인과 계정 저장
 
 - 아이디(영어 소문자로 시작, 소문자·숫자·밑줄 4~20자)와 비밀번호(6자 이상)만 받는다. 이메일은 받지 않으며 내부적으로 `아이디@VITE_LOGIN_EMAIL_DOMAIN` 주소로 변환한다. 이 주소로 메일을 보내지 않는다.
@@ -148,7 +166,7 @@
 
 ## 8. 저장과 시간
 
-저장 키 `coding-pet-save-v1`, payload `schemaVersion: 2` 유지. 펫 이름·캐릭터·상태·XP·도달 단계·성장·일일 기록·건강·수면·방·휴가·앨범·행동별 관리 시간을 저장한다. 관리 시간은 `maintenance`의 hunger/cleanliness/affection에 밀리초 기준 시각으로 보관하며 차감 시 처리한 구간만큼 기준을 전진한다.
+저장 키 `coding-pet-save-v1`, payload `schemaVersion: 2` 유지. 펫 이름·캐릭터·상태·XP·도달 단계·성장·일일 기록·건강·수면·방·휴가·앨범·행동별 관리 시간·연속 학습·졸업생·가족 시각을 저장한다. 관리 시간은 `maintenance`의 hunger/cleanliness/affection에 밀리초 기준 시각으로 보관하며 차감 시 처리한 구간만큼 기준을 전진한다.
 
 기존 기록의 이름·XP·단계를 보존한다. 손상된 핵심 데이터는 기본값 복구, 잘못된 추가 기록은 안전하게 보정한다. 저장 실패는 안내하고 메모리에서 계속 진행한다. 초기화는 확인창을 거친다. 시간 함수에 now를 주입하고 달력 날짜와 실제 경과시간을 구분한다.
 
@@ -162,7 +180,8 @@
 - `src/game/needs.js`(수치 감소·쓰레기), `meal.js`(배부름·반응 유지), `health.js`, `sleep.js`, `vacation.js`, `album.js`: 각 육성 기능.
 - `src/components/Guide.jsx`: 사용방법 패널·튜토리얼.
 - `src/game/storage.js`: 저장·검증·이전·초기화·계정 기록 가져오기.
-- `src/game/shop.js`, `src/components/Shop.jsx`: 꾸미기 상점.
+- `src/game/shop.js`, `src/components/Shop.jsx`: 꾸미기 상점(연속 학습 한정품 포함).
+- `src/game/streak.js`: 연속 학습. `src/game/family.js`, `src/components/Family.jsx`: 졸업·다음 세대·세 마리 가족.
 - `src/game/account.js`, `cloud.js`, `src/components/AccountPanel.jsx`: 로그인·계정 저장.
 - `src/data/characters.js`, `src/components/`, `src/App.jsx`, `src/App.css`: 이미지 선택·화면·상태 연결.
 - `public/pets/characters/`: 캐릭터 PNG, `public/pets/*.svg`: 대체 이미지.

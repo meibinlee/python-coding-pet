@@ -9,7 +9,13 @@ export const shopItems = [
   { id: 'flower', slot: 'headband', name: '꽃 머리띠', price: 50 },
   { id: 'crown', slot: 'headband', name: '왕관 머리띠', price: 80 },
 ];
-export const itemFor = id => shopItems.find(item => item.id === id) ?? null;
+// Streak rewards (streak.js): never sold, unlocked for every pet.
+export const limitedItems = [
+  { id: 'sprout', slot: 'headband', name: '새싹 머리띠', limited: true },
+  { id: 'medal', slot: 'clothes', name: '별 메달', limited: true },
+  { id: 'rainbow', slot: 'clothes', name: '무지개 망토', limited: true },
+];
+export const itemFor = id => shopItems.find(item => item.id === id) ?? limitedItems.find(item => item.id === id) ?? null;
 export const newWardrobe = () => ({ owned: [], equipped: { clothes: null, headband: null } });
 export const canShop = pet => pet.level >= SHOP_LEVEL;
 
@@ -26,7 +32,7 @@ export function normalizeWardrobe(record) {
 // A purchase equips the item right away; returning the same state means "blocked".
 export function buyItem(state, itemId) {
   const item = itemFor(itemId), pet = state.pet;
-  if (!item || !canShop(pet) || pet.wardrobe.owned.includes(itemId) || pet.totalXp < item.price) return state;
+  if (!item || item.limited || !canShop(pet) || pet.wardrobe.owned.includes(itemId) || pet.totalXp < item.price) return state;
   return { ...state, pet: { ...pet, totalXp: pet.totalXp - item.price, wardrobe: {
     owned: [...pet.wardrobe.owned, itemId],
     equipped: { ...pet.wardrobe.equipped, [item.slot]: itemId },
