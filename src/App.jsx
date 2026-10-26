@@ -20,7 +20,7 @@ import { actions, growth, growthStatus, refreshGrowth, isRoomMessy } from './gam
 import { sleepStatus, isActionResting } from './game/sleep.js';
 import { isOnVacation } from './game/vacation.js';
 import { healthStatus } from './game/health.js';
-import { currentDaily, nextKoreanMidnight } from './game/time.js';
+import { currentDaily, nextQuizReset, nextResetLabel } from './game/time.js';
 import { DAILY_LIMIT, submitStored, updateStored, basicCare, setVacation } from './game/daily.js';
 import { SAVE_KEY, loadPet, savePet, resetPet, defaultPet, createPet, DEFAULT_PET_NAME, readSave, importSave, validateSave } from './game/storage.js';
 
@@ -29,7 +29,6 @@ const TUTORIAL_KEY = 'coding-pet-tutorial-v1';
 function tutorialSeen() {
   try { return localStorage.getItem(TUTORIAL_KEY) === '1'; } catch { return false; }
 }
-const LIMIT_MESSAGE = '오늘의 10문제를 모두 풀었어요. 한국 시간 자정부터 다시 풀 수 있어요.';
 
 function formatWait(ms) {
   const minutes = Math.ceil(ms / 60000);
@@ -86,7 +85,7 @@ export default function App() {
       const status = growthStatus(stateRef.current.pet, time);
       const healthTime = healthStatus(stateRef.current.pet, time).nextCheckMs;
       const napTime = sleepStatus(stateRef.current.pet, time).remainingMs;
-      timer = setTimeout(refresh, Math.min(30000, napTime > 0 ? napTime + 1 : 30000, healthTime > 0 ? healthTime + 1 : 30000, nextKoreanMidnight(time) - time + 1, status.remainingMs > 0 ? status.remainingMs + 1 : 30000));
+      timer = setTimeout(refresh, Math.min(30000, napTime > 0 ? napTime + 1 : 30000, healthTime > 0 ? healthTime + 1 : 30000, nextQuizReset(time) - time + 1, status.remainingMs > 0 ? status.remainingMs + 1 : 30000));
       if (!submitting.current) {
         const snapshot = stateRef.current.pet;
         updateStored(stateRef.current, refreshGrowth, { preferMemory: memoryOnly.current }).then(result => {
@@ -308,7 +307,7 @@ export default function App() {
       itemId ? '새로 입혀 줬어요!' : '벗겨 줬어요.', '이미 바뀌었어요. 현재 상태를 확인해 주세요.');
   }
 
-  async function performUpdate(update, successMessage = '', blockedMessage = '이미 처리한 행동이거나 오늘의 횟수를 모두 사용했어요. 한국 시간 자정에 다시 만나요.') {
+  async function performUpdate(update, successMessage = '', blockedMessage = '이미 처리한 행동이거나 지금 풀 수 있는 문제를 모두 풀었어요.') {
     if (submitting.current) return null;
     submitting.current = true;
     setPending(true);
@@ -379,7 +378,7 @@ export default function App() {
       return;
     }
     if (currentDaily(state.pet, time).count >= DAILY_LIMIT) {
-      setNotice(LIMIT_MESSAGE);
+      setNotice(`오늘의 복습이 끝났어요! ${nextResetLabel(time)}에 다시 만나요.`);
       return;
     }
     const question = nextQuestion(history.current);
@@ -486,7 +485,7 @@ export default function App() {
           </ul>
         </section>}
         <StatusBars pet={state.pet} canSicken={stage.level >= 2} />
-        <div className="daily-summary" role="status"><strong>오늘 {daily.count} / {DAILY_LIMIT}문제</strong>{daily.count >= DAILY_LIMIT && <span> · 오늘의 복습 끝! 자정에 다시 만나요</span>}</div>
+        <div className="daily-summary" role="status"><strong>지금 {daily.count} / {DAILY_LIMIT}문제</strong>{daily.count >= DAILY_LIMIT ? <span> · 오늘의 복습이 끝났어요! {nextResetLabel(now)}에 다시 만나요</span> : <span> · {nextResetLabel(now)}에 새로 충전</span>}</div>
         <div className="actions">
           {Object.entries(actions).map(([action, label], index) => {
             const resting = isActionResting(state.pet, action, now);
@@ -533,7 +532,7 @@ export default function App() {
     </aside>
     </div>
     <footer>{account.user ? <>{account.user.username} 계정과 이 브라우저에 자동 저장돼요<br /></> : <>이 브라우저에 자동 저장돼요{account.status === 'off' ? '' : ' · 로그인하면 다른 기기에서도 이어서 키워요'}<br /></>}<span className="credit">by.meibinlee</span></footer>
-    {state.quiz && <QuizModal quiz={state.quiz} pending={pending} limitReached={daily.count >= DAILY_LIMIT} sleepBlocked={isActionResting(state.pet,state.quiz.action,now)} restMessage={feedRest} vacationBlocked={onVacation}
+    {state.quiz && <QuizModal quiz={state.quiz} pending={pending} limitReached={daily.count >= DAILY_LIMIT} resetLabel={nextResetLabel(now)} sleepBlocked={isActionResting(state.pet,state.quiz.action,now)} restMessage={feedRest} vacationBlocked={onVacation}
       onAnswer={answer} onNext={() => openQuiz(state.quiz.action)} onClose={closeQuiz} />}
     {showGuide && <GuideDialog onClose={() => setShowGuide(false)} onTutorial={openTutorial} />}
     {showTutorial && !state.quiz && <Tutorial onClose={closeTutorial} />}

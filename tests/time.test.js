@@ -37,3 +37,27 @@ it('preserves a complete checklist on reload and resets it at Korean midnight',(
   expect(validateSave(pet,now).daily).toMatchObject({count:1,careDone:true,careActions:['hunger']});
   expect(validateSave(pet,now+1).daily).toMatchObject({count:0,careDone:false,careActions:[]});
 });
+it('refills questions at Korean 0, 7, 13 and 19 hours while keeping daily care',async()=>{
+  const { quizPeriod, nextQuizReset, nextResetLabel } = await import('../src/game/time.js');
+  const at=(hhmm)=>Date.parse(`2026-10-26T${hhmm}:00+09:00`);
+  expect(['00:00','06:59','07:00','12:59','13:00','18:59','19:00','23:59'].map(t=>quizPeriod(at(t)))).toEqual([0,0,7,7,13,13,19,19]);
+  expect(nextQuizReset(at('06:30'))).toBe(at('07:00'));
+  expect(nextQuizReset(at('19:00'))).toBe(at('00:00')+DAY_MS);
+  expect([at('05:00'),at('10:00'),at('15:00'),at('21:00')].map(nextResetLabel)).toEqual(['아침 7시','오후 1시','저녁 7시','자정']);
+  const pet={...defaultPet(at('08:00')),daily:{date:'2026-10-26',period:7,count:10,submittedIds:Array.from({length:10},(_,i)=>`q${i}`),careDone:true,nursingDone:false,careActions:['hunger']}};
+  expect(currentDaily(pet,at('12:59')).count).toBe(10);
+  const refilled=currentDaily(pet,at('13:00'));
+  expect(refilled).toMatchObject({period:13,count:0,submittedIds:[],careDone:true,careActions:['hunger']});
+  expect(currentDaily({...pet,daily:{...pet.daily,period:undefined}},at('13:30')).count).toBe(10);
+  expect(validateSave({...pet,daily:{...pet.daily,period:19}},at('08:00')).daily.period).toBe(7);
+});
+it('allows a new set of ten answers after a refill without repeating rewards',async()=>{
+  const { submitDaily } = await import('../src/game/daily.js');
+  const at=(hhmm)=>Date.parse(`2026-10-26T${hhmm}:00+09:00`);
+  const quiz=(pet,id)=>({pet,quiz:{action:'affection',answered:false,question:{instanceId:id,correctAnswer:'4',options:['4','5','6','7']}}});
+  let pet=defaultPet(at('07:10'));
+  for(let i=0;i<10;i++)pet=submitDaily(quiz(pet,`a${i}`),'5',at('07:10')).pet;
+  const blocked=quiz(pet,'late');expect(submitDaily(blocked,'4',at('12:00'))).toBe(blocked);
+  const next=submitDaily(quiz(pet,'b0'),'4',at('13:05')).pet;
+  expect(next.daily).toMatchObject({period:13,count:1});
+});

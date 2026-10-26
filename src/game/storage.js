@@ -7,7 +7,7 @@ import { newSleep, normalizeSleep, validSleep } from './sleep.js';
 import { newVacation, normalizeVacation } from './vacation.js';
 import { isCharacterId } from '../data/characters.js';
 import { newAlbum, normalizeAlbum } from './album.js';
-import { emptyDaily, koreanDate } from './time.js';
+import { emptyDaily, koreanDate, quizPeriod, QUIZ_RESET_HOURS } from './time.js';
 import { newWardrobe, normalizeWardrobe } from './shop.js';
 
 export const DEFAULT_PET_NAME = '파이썬';
@@ -108,6 +108,7 @@ export function validateSave(data, now = Date.now()) {
   pet.daily = validDaily(daily) && daily.date === koreanDate(now)
     ? {
       date: daily.date,
+      period: QUIZ_RESET_HOURS.includes(daily.period) && daily.period <= quizPeriod(now) ? daily.period : quizPeriod(now),
       count: daily.count,
       submittedIds: [...daily.submittedIds],
       careDone: daily.careDone === true,
