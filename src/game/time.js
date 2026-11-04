@@ -27,7 +27,7 @@ export function nextQuizReset(now = Date.now()) {
 const RESET_NAMES = { 0: '자정', 7: '아침 7시', 13: '오후 1시', 19: '저녁 7시' };
 export const nextResetLabel = (now = Date.now()) => RESET_NAMES[quizPeriod(nextQuizReset(now))];
 export function emptyDaily(now = Date.now()) {
-  return { date: koreanDate(now), period: quizPeriod(now), count: 0, answered: 0, submittedIds: [], careDone: false, nursingDone: false, careActions: [] };
+  return { date: koreanDate(now), period: quizPeriod(now), count: 0, answered: 0, submittedIds: [], careDone: false, nursingDone: false, careActions: [], last: null };
 }
 export function currentDaily(pet, now = Date.now()) {
   if (pet.daily?.date !== koreanDate(now)) return emptyDaily(now);

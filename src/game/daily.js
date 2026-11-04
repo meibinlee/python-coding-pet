@@ -33,6 +33,7 @@ export function submitDaily(state, answer, now = Date.now()) {
       ...daily,
       count: daily.count + (challenge ? 0 : 1),
       answered: (daily.answered ?? 0) + 1,
+      last: { action: quiz.action, at: new Date(now).toISOString() },
       submittedIds: challenge ? daily.submittedIds : [...daily.submittedIds, quiz.question.instanceId],
       careActions: correct ? [...new Set([...daily.careActions,quiz.action])] : daily.careActions,
     },

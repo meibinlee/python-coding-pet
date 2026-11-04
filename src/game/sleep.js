@@ -29,5 +29,21 @@ export function startNap(before, after, action, correct, now = Date.now()) {
   return { ...after, sleep: { startedAt: new Date(now).toISOString(), endsAt: new Date(now + NAP_MS).toISOString() } };
 }
 
+// Display only (no game effect): a care reaction lasts 5 seconds. After the questions run out,
+// the pet loops: repeats its last action for 5 s, naps for 25 s, then stays awake for 15 s.
+export const REACTION_MS = 5000;
+export const REST_CYCLE = [['action', 5000], ['sleep', 25000], ['awake', 15000]];
+const REST_CYCLE_MS = REST_CYCLE.reduce((sum, [, ms]) => sum + ms, 0);
+export const ACTION_POSES = { hunger: 'eat', cleanliness: 'clean', affection: 'play' };
+export function restPose(lastAction, startedAt, now = Date.now()) {
+  if (!Number.isFinite(startedAt) || now < startedAt) return null;
+  let phase = (now - startedAt) % REST_CYCLE_MS;
+  for (const [pose, ms] of REST_CYCLE) {
+    if (phase < ms) return pose === 'action' ? ACTION_POSES[lastAction] ?? null : pose === 'sleep' ? 'sleep' : null;
+    phase -= ms;
+  }
+  return null;
+}
+
 // Feeding rests while napping or full; cleaning and play stay available.
 export const isActionResting = (pet, action, now = Date.now()) => action === 'hunger' && (sleepStatus(pet, now).sleeping || isFull(pet, now));

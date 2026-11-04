@@ -20,8 +20,8 @@ export function recordMeal(pet, now = Date.now()) {
   return { ...pet, meal: feeds >= FEEDS_TO_FULL ? { feeds: 0, fullUntil: new Date(now + FULL_MS).toISOString() } : { feeds, fullUntil: null } };
 }
 
-// A cheerful or tidy look stays for a while after playing or cleaning.
-export const MOOD_MS = 30 * 60 * 1000;
+// A cheerful or tidy look stays for 5 seconds after playing or cleaning.
+export const MOOD_MS = 5 * 1000;
 export const newMood = () => ({ kind: null, until: null });
 export function normalizeMood(record, now = Date.now()) {
   const until = typeof record?.until === 'string' ? Date.parse(record.until) : NaN;

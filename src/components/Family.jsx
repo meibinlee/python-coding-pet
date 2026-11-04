@@ -27,7 +27,7 @@ export function HealthDetails({ pet, health }) {
   </section>;
 }
 
-export function FamilyMember({ pet, now, limitReached = false }) {
+export function FamilyMember({ pet, now, limitReached = false, pose = null }) {
   const stage = growth(pet.totalXp, pet.level), health = healthStatus(pet, now), mood = activeMood(pet, now);
   return <article className="family-member" aria-label={pet.petName}>
     <div className="member-heading">
@@ -35,7 +35,7 @@ export function FamilyMember({ pet, now, limitReached = false }) {
       <h3>{pet.petName}</h3>
       <span className="member-xp">{pet.totalXp} XP</span>
     </div>
-    <Pet pet={pet} stage={stage} sick={health.sick} sickMessage={health.cause ? SICK_CAUSES[health.cause] : ''} sleeping={sleepStatus(pet, now).sleeping} full={isFull(pet, now)} messy={isRoomMessy(pet)} trash={trashCount(pet.cleanliness)} cleaning={mood === 'clean'} playing={mood === 'play'} vacation={isOnVacation(pet)} limitReached={limitReached} />
+    <Pet pet={pet} stage={stage} sick={health.sick} sickMessage={health.cause ? SICK_CAUSES[health.cause] : ''} sleeping={sleepStatus(pet, now).sleeping} full={isFull(pet, now)} messy={isRoomMessy(pet)} trash={trashCount(pet.cleanliness)} cleaning={mood === 'clean'} playing={mood === 'play'} vacation={isOnVacation(pet)} limitReached={limitReached} pose={pose} />
     {health.sick && <HealthDetails pet={pet} health={health} />}
     <StatusBars pet={pet} canSicken />
   </article>;

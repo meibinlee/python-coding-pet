@@ -126,6 +126,8 @@ export function validateSave(data, now = Date.now()) {
       submittedIds: [...daily.submittedIds],
       careDone: daily.careDone === true,
       nursingDone: daily.careDone === true && daily.nursingDone === true,
+      last: ['hunger', 'cleanliness', 'affection'].includes(daily.last?.action) && typeof daily.last.at === 'string' &&
+        Number.isFinite(Date.parse(daily.last.at)) && Date.parse(daily.last.at) <= now ? { action: daily.last.action, at: new Date(daily.last.at).toISOString() } : null,
       careActions: Array.isArray(daily.careActions)
         ? [...new Set(daily.careActions.filter(action => ['hunger', 'cleanliness', 'affection'].includes(action)))]
         : [],

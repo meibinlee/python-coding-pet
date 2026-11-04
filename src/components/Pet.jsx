@@ -4,7 +4,11 @@ import { useEffect, useRef, useState } from 'react';
 
 const TRASH = ['🥤', '🍂', '📄', '🧻'];
 
-export default function Pet({ pet, stage, limitReached = false, sick = false, sickMessage = '', sleeping = false, full = false, messy = false, trash = 0, cleaning = false, playing = false, vacation = false }) {
+export default function Pet({ pet, stage, limitReached = false, sick = false, sickMessage = '', sleeping = false, full = false, messy = false, trash = 0, cleaning = false, playing = false, vacation = false, pose = null }) {
+  // `pose` is display only: a 5-second care reaction or the rest loop after the questions run out.
+  const dozing = !sleeping && pose === 'sleep', eating = pose === 'eat';
+  cleaning = cleaning || pose === 'clean';
+  playing = playing || pose === 'play';
   const [petted, setPetted] = useState(false);
   const cooldown = useRef(false);
   const timer = useRef(null);
@@ -20,7 +24,9 @@ export default function Pet({ pet, stage, limitReached = false, sick = false, si
     }, 1600);
   }
 
-  const message = sleeping ? (sick ? '조금 아파서 쉬고 있어. 간호해 줄래?' : '배불러서 잠깐 쉬고 있어… Zzz')
+  const message = dozing ? '오늘도 수고했어… Zzz'
+    : eating ? '냠냠, 맛있어!'
+    : sleeping ? (sick ? '조금 아파서 쉬고 있어. 간호해 줄래?' : '배불러서 잠깐 쉬고 있어… Zzz')
     : sick ? (sickMessage ? `${sickMessage}. 보살펴 줄래?` : '조금 아파. 곁에서 보살펴 줄래?')
     : cleaning ? '반짝반짝! 깨끗해서 기분 좋아! ✦'
     : playing ? '함께 노니까 정말 신나! ♥'
@@ -32,7 +38,7 @@ export default function Pet({ pet, stage, limitReached = false, sick = false, si
     : pet.affection >= 85 ? '네가 와서 기뻐!'
     : '함께 코딩할래?';
 
-  const mood = petMood(pet,{sleeping,cleaning,sick,vacation,playing,petted});
+  const mood = petMood(pet,{sleeping:sleeping || dozing,cleaning,sick,vacation,playing,petted:petted || eating});
   const src = characterImage(pet.characterId,stage.level,mood,import.meta.env.BASE_URL);
   const anchor = accessoryAnchor(pet.characterId, mood);
   const worn = stage.level >= SHOP_LEVEL && anchor ? ['clothes','headband'].map(slot => itemFor(pet.wardrobe?.equipped?.[slot])).filter(Boolean) : [];
@@ -41,7 +47,7 @@ export default function Pet({ pet, stage, limitReached = false, sick = false, si
     <span className="spark s1" aria-hidden="true">✧</span>
     <span className="spark s2" aria-hidden="true">✦</span>
     <div className="bubble" role="status">{message}</div>
-    <button className={`pet-button${petted ? ' petted' : ''}${sick ? ' sick-pet' : ''}${sleeping ? ' sleeping-pet' : ''}${vacation ? ' vacation-pet' : ''}`} onClick={petFriend} aria-label={`${pet.petName} 쓰다듬기`}>
+    <button className={`pet-button${petted ? ' petted' : ''}${sick ? ' sick-pet' : ''}${sleeping || dozing ? ' sleeping-pet' : ''}${vacation ? ' vacation-pet' : ''}`} onClick={petFriend} aria-label={`${pet.petName} 쓰다듬기`}>
       <span className="pet-figure" style={anchor ? {
         '--head-top': `${anchor.headTop}%`, '--head-x': `${anchor.headX}%`, '--head-width': `${anchor.headWidth}%`, '--head-rot': `${anchor.headRot}deg`,
         '--neck': `${anchor.neck}%`, '--neck-x': `${anchor.neckX}%`, '--clothes-width': `${anchor.clothesWidth}%`, '--neck-rot': `${anchor.neckRot}deg`,
@@ -50,7 +56,7 @@ export default function Pet({ pet, stage, limitReached = false, sick = false, si
         <img className="pet" src={src} alt={`${characterFor(pet.characterId)?.name ?? '친구'} · ${stage.name} 모습의 ${pet.petName}${wornText}`} width="210" height="210" />
         {worn.map(item => <img key={item.id} className={`accessory acc-${item.slot} acc-${item.id}`} src={`${import.meta.env.BASE_URL}pets/accessories/${item.id}.svg`} alt="" aria-hidden="true" />)}
       </span>
-      {sleeping && <span className="sleep-mark" aria-hidden="true">Zzz</span>}
+      {(sleeping || dozing) && <span className="sleep-mark" aria-hidden="true">Zzz</span>}
       {sick && <span className="pet-bandage" aria-hidden="true">✚</span>}
       {petted && <span className="pet-heart" aria-hidden="true">♥</span>}
     </button>

@@ -1,2 +1,14 @@
 import { NEED_LABELS, LOW_NEED } from '../game/needs.js';
-export default function StatusBars({pet, canSicken = false}) {return <div className="status-bars">{[['hunger','🍙'],['cleanliness','🫧'],['affection','♥']].map(([key,icon])=><div className={`status ${key}${canSicken&&pet[key]<=LOW_NEED?' low':''}`} key={key}><div><span>{icon} {NEED_LABELS[key]}</span><strong>{pet[key]} <small>/ 100</small></strong></div><progress aria-label={NEED_LABELS[key]} max="100" value={pet[key]}/>{canSicken&&pet[key]<=LOW_NEED&&<em className="status-warn">⚠ {pet[key]===0?'아파요':'곧 아파요'}</em>}</div>)}</div>;}
+export default function StatusBars({ pet, canSicken = false }) {
+  return <div className="status-bars">{[['hunger', '🍙'], ['cleanliness', '🫧'], ['affection', '♥']].map(([key, icon]) => {
+    const low = canSicken && pet[key] <= LOW_NEED;
+    return <div className={`status ${key}${low ? ' low' : ''}`} key={key}>
+      <span className="status-icon" aria-hidden="true">{icon}</span>
+      <div className="status-body">
+        <div><span>{NEED_LABELS[key]}</span><strong>{pet[key]}</strong></div>
+        <progress aria-label={NEED_LABELS[key]} max="100" value={pet[key]} />
+        {low && <em className="status-warn">⚠ {pet[key] === 0 ? '아파요' : '곧 아파요'}</em>}
+      </div>
+    </div>;
+  })}</div>;
+}
