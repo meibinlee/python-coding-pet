@@ -13,7 +13,7 @@ import { buyItem, equipItem, itemFor } from './game/shop.js';
 import { FamilyMember, GraduationPanel, RestingGraduates, HealthDetails } from './components/Family.jsx';
 import { isFamily, familyPets, familyCanCare, graduate, updateMember } from './game/family.js';
 import { streakStatus } from './game/streak.js';
-import { resolveLogin, cloudChangedElsewhere, syncAction, readOwner, writeOwner, clearOwner, saveTime } from './game/account.js';
+import { resolveLogin, cloudChangedElsewhere, syncAction, readOwner, writeOwner, clearOwner, saveTime, markActed } from './game/account.js';
 import { cloudConfigured, cloudMessage, currentUser, signUp, signIn, signOut, fetchCloudSave, pushCloudSave, deleteCloudSave } from './game/cloud.js';
 import { characterImage, characterFor } from './data/characters.js';
 import { selectCharacter } from './game/album.js';
@@ -167,7 +167,7 @@ export default function App() {
         const cloud = await fetchCloudSave(user.id);
         if (userRef.current?.id !== user.id || submitting.current || stateRef.current.quiz) return;
         if (cloud && JSON.stringify(cloud) === text) { markSynced(user, cloud); return; }
-        const action = syncAction({ localSave: save, cloudSave: cloud && validateSave(cloud) ? cloud : null, syncedAt: readOwner()?.syncedAt, localChanged });
+        const action = syncAction({ localSave: save, cloudSave: cloud && validateSave(cloud) ? cloud : null, syncedAt: readOwner()?.syncedAt, localChanged, acted: readOwner()?.acted });
         if (action === 'download') {
           download(user, cloud);
           setNotice('다른 기기에서 진행한 더 최근 기록을 불러왔어요.');
@@ -196,7 +196,9 @@ export default function App() {
   }
   function markSynced(user, save) {
     lastPushed.current = JSON.stringify(save);
-    writeOwner(user.id, saveTime(save));
+    // An action saved after this snapshot still counts as unsynced progress.
+    const unsynced = readOwner()?.acted && JSON.stringify(readSave()) !== lastPushed.current;
+    writeOwner(user.id, saveTime(save), undefined, Boolean(unsynced));
   }
   async function upload(user, save) {
     await pushCloudSave(user.id, save);
@@ -219,7 +221,8 @@ export default function App() {
     const cloud = await fetchCloudSave(user.id);
     const cloudSave = cloud && validateSave(cloud) ? cloud : null;
     const local = localPayload();
-    let decision = resolveLogin({ localSave: local, localOwner: readOwner()?.id, cloudSave, userId: user.id });
+    const owner = readOwner();
+    let decision = resolveLogin({ localSave: local, localOwner: owner?.id, cloudSave, userId: user.id, syncedAt: owner?.syncedAt, acted: owner?.acted });
     if (decision === 'ask') {
       if (window.confirm(`이 브라우저와 계정에 서로 다른 펫 기록이 있어요.\n· 이 브라우저: ${local.petName} (XP ${local.totalXp})\n· 계정: ${cloudSave.petName} (XP ${cloudSave.totalXp})\n\n[확인] 계정의 ${cloudSave.petName}을(를) 불러와요.\n[취소] 다른 선택지를 볼게요.`)) decision = 'download';
       else if (window.confirm(`이 브라우저의 ${local.petName}을(를) 계정에 저장할까요?\n계정에 있던 ${cloudSave.petName}의 기록은 사라져요.\n[취소] 로그인을 취소하고 두 기록을 그대로 둬요.`)) decision = 'upload';
@@ -347,6 +350,7 @@ export default function App() {
         setNotice(blockedMessage);
       } else {
         memoryOnly.current = false;
+        markActed();
         setNotice(successMessage);
       }
       return result;

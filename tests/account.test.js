@@ -1,5 +1,5 @@
 import { it, expect } from 'vitest';
-import { credentialError, usernameToEmail, usernameFromEmail, resolveLogin, cloudChangedElsewhere, syncAction, authErrorMessage, readOwner, writeOwner, clearOwner } from '../src/game/account.js';
+import { credentialError, usernameToEmail, usernameFromEmail, resolveLogin, cloudChangedElsewhere, syncAction, authErrorMessage, readOwner, writeOwner, clearOwner, markActed } from '../src/game/account.js';
 import { createPet, readSave, importSave, savePet, SAVE_KEY } from '../src/game/storage.js';
 const t=Date.parse('2026-10-26T03:00:00Z');
 const save=(name,time,xp=10)=>({...createPet(name,'chiikawa',t),totalXp:xp,lastUpdatedAt:new Date(time).toISOString()});
@@ -21,7 +21,7 @@ it('carries a guest pet into a new or empty account',()=>{
 });
 it('continues the account pet on a fresh browser and follows the newer save for the same owner',()=>{
   expect(resolveLogin({localSave:null,localOwner:null,cloudSave:save('cloud',t),userId:'u1'})).toBe('download');
-  expect(resolveLogin({localSave:save('p',t+5),localOwner:'u1',cloudSave:save('p',t),userId:'u1'})).toBe('upload');
+  expect(resolveLogin({localSave:save('p',t+5),localOwner:'u1',cloudSave:save('p',t),userId:'u1',syncedAt:t})).toBe('upload');
   expect(resolveLogin({localSave:save('p',t),localOwner:'u1',cloudSave:save('p',t+5),userId:'u1'})).toBe('download');
 });
 it('asks before replacing when this browser holds a different pet',()=>{
@@ -44,7 +44,7 @@ it('shows friendly Korean messages for auth errors',()=>{
 it('stores the owner record per browser and tolerates broken values',()=>{
   const storage=memory();
   expect(readOwner(storage)).toBeNull();
-  writeOwner('u1',t,storage);expect(readOwner(storage)).toEqual({id:'u1',syncedAt:t});
+  writeOwner('u1',t,storage);expect(readOwner(storage)).toEqual({id:'u1',syncedAt:t,acted:false});
   storage.setItem('coding-pet-account-v1','{broken');expect(readOwner(storage)).toBeNull();
   clearOwner(storage);expect(readOwner(storage)).toBeNull();
 });
@@ -63,6 +63,22 @@ it('pulls another device’s newer save, uploads local changes and lets the newe
   expect(syncAction({localSave:save('p',t+5),cloudSave:save('p',t),syncedAt:synced,localChanged:true})).toBe('upload');
   expect(syncAction({localSave:save('p',t),cloudSave:save('p',t+9),syncedAt:synced,localChanged:false})).toBe('download');
   expect(syncAction({localSave:save('p',t+5),cloudSave:save('p',t+9),syncedAt:synced,localChanged:true})).toBe('download');
-  expect(syncAction({localSave:save('p',t+12),cloudSave:save('p',t+9),syncedAt:synced,localChanged:true})).toBe('upload');
+  expect(syncAction({localSave:save('p',t+12),cloudSave:save('p',t+9),syncedAt:synced,localChanged:true,acted:true})).toBe('upload');
+  // Opening an old device only applies time-based updates; the other device's progress wins.
+  expect(syncAction({localSave:save('p',t+12,100),cloudSave:save('p',t+9,300),syncedAt:synced,localChanged:true,acted:false})).toBe('download');
   expect(syncAction({localSave:save('p',t+5),cloudSave:null,syncedAt:synced,localChanged:true})).toBe('upload');
+});
+
+it('keeps another device’s progress when this browser only applied time-based updates at startup',()=>{
+  const phone=save('p',t+9,300), tablet=save('p',t+12,100);
+  expect(resolveLogin({localSave:tablet,localOwner:'u1',cloudSave:phone,userId:'u1',syncedAt:t,acted:false})).toBe('download');
+  expect(resolveLogin({localSave:tablet,localOwner:'u1',cloudSave:phone,userId:'u1',syncedAt:t,acted:true})).toBe('upload');
+  expect(resolveLogin({localSave:tablet,localOwner:'u1',cloudSave:save('p',t,100),userId:'u1',syncedAt:t})).toBe('upload');
+});
+it('records a player action until the next sync',()=>{
+  const storage=memory();
+  markActed(storage);expect(readOwner(storage)).toBeNull();
+  writeOwner('u1',t,storage);expect(readOwner(storage).acted).toBe(false);
+  markActed(storage);expect(readOwner(storage)).toEqual({id:'u1',syncedAt:t,acted:true});
+  writeOwner('u1',t+5,storage);expect(readOwner(storage).acted).toBe(false);
 });

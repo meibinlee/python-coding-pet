@@ -36,10 +36,14 @@ const updatedAt = save => {
  * upload: keep this browser's pet in the account (also the guest → member path).
  * download: continue the account's pet here. ask: two different pets, let the player choose.
  */
-export function resolveLogin({ localSave, localOwner, cloudSave, userId }) {
+export function resolveLogin({ localSave, localOwner, cloudSave, userId, syncedAt, acted = false }) {
   if (!cloudSave) return localSave ? 'upload' : 'none';
   if (!localSave) return 'download';
-  if (localOwner === userId) return updatedAt(localSave) > updatedAt(cloudSave) ? 'upload' : 'download';
+  if (localOwner === userId) {
+    // Time-based updates alone must not overwrite progress made on another device.
+    if (cloudChangedElsewhere(cloudSave, syncedAt) && !acted) return 'download';
+    return updatedAt(localSave) > updatedAt(cloudSave) ? 'upload' : 'download';
+  }
   const { lastUpdatedAt: _a, ...local } = localSave, { lastUpdatedAt: _b, ...cloud } = cloudSave;
   return JSON.stringify(local) === JSON.stringify(cloud) ? 'download' : 'ask';
 }
@@ -51,24 +55,31 @@ export function cloudChangedElsewhere(cloudSave, syncedAt) {
 
 /**
  * One sync step while signed in. A newer save from another device is pulled in when
- * this browser has nothing new; when both changed, the more recent save wins.
+ * the player did nothing here since the last sync (time-based updates do not count);
+ * when the player acted on both devices, the more recent save wins.
  */
-export function syncAction({ localSave, cloudSave, syncedAt, localChanged }) {
+export function syncAction({ localSave, cloudSave, syncedAt, localChanged, acted = false }) {
   if (!cloudChangedElsewhere(cloudSave, syncedAt)) return localChanged ? 'upload' : 'none';
-  if (!localChanged) return 'download';
+  if (!localChanged || !acted) return 'download';
   return updatedAt(cloudSave) >= updatedAt(localSave) ? 'download' : 'upload';
 }
 
-// Which account this browser's save belongs to, and the save time last synced.
-// Shared by all tabs of this browser so one tab's upload is not mistaken for another device.
+// Which account this browser's save belongs to, the save time last synced, and whether
+// the player acted here since then. Shared by all tabs of this browser so one tab's
+// upload is not mistaken for another device.
 export function readOwner(storage) {
   try {
     const value = JSON.parse((storage ?? globalThis.localStorage).getItem(OWNER_KEY));
-    return value && typeof value.id === 'string' ? { id: value.id, syncedAt: Number.isFinite(value.syncedAt) ? value.syncedAt : 0 } : null;
+    return value && typeof value.id === 'string' ? { id: value.id, syncedAt: Number.isFinite(value.syncedAt) ? value.syncedAt : 0, acted: value.acted === true } : null;
   } catch { return null; }
 }
-export function writeOwner(id, syncedAt, storage) {
-  try { (storage ?? globalThis.localStorage).setItem(OWNER_KEY, JSON.stringify({ id, syncedAt })); } catch { /* sync still works for this tab */ }
+export function writeOwner(id, syncedAt, storage, acted = false) {
+  try { (storage ?? globalThis.localStorage).setItem(OWNER_KEY, JSON.stringify({ id, syncedAt, acted })); } catch { /* sync still works for this tab */ }
+}
+// Records a player action (quiz, care, shop…) not yet synced to the account.
+export function markActed(storage) {
+  const owner = readOwner(storage);
+  if (owner && !owner.acted) writeOwner(owner.id, owner.syncedAt, storage, true);
 }
 export function clearOwner(storage) {
   try { (storage ?? globalThis.localStorage).removeItem(OWNER_KEY); } catch { /* nothing to clear */ }
