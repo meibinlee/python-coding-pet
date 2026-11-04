@@ -10,6 +10,8 @@ import { newAlbum, normalizeAlbum } from './album.js';
 import { emptyDaily, koreanDate, quizPeriod, QUIZ_RESET_HOURS } from './time.js';
 import { newWardrobe, normalizeWardrobe } from './shop.js';
 import { newStreak, normalizeStreak } from './streak.js';
+import { newQuest, normalizeQuest } from './quest.js';
+import { questItems } from './shop.js';
 import { FAMILY_SIZE } from './family.js';
 
 export const DEFAULT_PET_NAME = '파이썬';
@@ -35,6 +37,7 @@ export const defaultPet = (now = Date.now()) => ({
   meal: newMeal(),
   mood: newMood(),
   streak: newStreak(),
+  quest: newQuest(),
   graduates: [],
   familyAt: null,
   graduatedAt: null,
@@ -106,7 +109,7 @@ export function validateSave(data, now = Date.now()) {
 
   // Keep the existing storage key; migrate the payload without resetting the pet.
   const pet = Object.fromEntries(Object.keys(defaultPet(now))
-    .filter(key => !['daily', 'lastCareAt', 'level', 'growth', 'schemaVersion', 'health', 'sleep', 'room', 'vacation', 'characterId', 'album', 'maintenance', 'wardrobe', 'needs', 'meal', 'mood', 'streak', 'graduates', 'familyAt', 'graduatedAt'].includes(key)).map(key => [key, data[key]]));
+    .filter(key => !['daily', 'lastCareAt', 'level', 'growth', 'schemaVersion', 'health', 'sleep', 'room', 'vacation', 'characterId', 'album', 'maintenance', 'wardrobe', 'needs', 'meal', 'mood', 'streak', 'quest', 'graduates', 'familyAt', 'graduatedAt'].includes(key)).map(key => [key, data[key]]));
   pet.schemaVersion = 2;
   const savedLevel = [1,2,3].includes(data.level) ? data.level : 1;
   pet.level = data.schemaVersion === 1 ? Math.max(savedLevel,growth(data.totalXp).level) : savedLevel;
@@ -119,6 +122,7 @@ export function validateSave(data, now = Date.now()) {
       date: daily.date,
       period: QUIZ_RESET_HOURS.includes(daily.period) && daily.period <= quizPeriod(now) ? daily.period : quizPeriod(now),
       count: daily.count,
+      answered: Number.isSafeInteger(daily.answered) && daily.answered >= daily.count ? Math.min(daily.answered, 40) : daily.count,
       submittedIds: [...daily.submittedIds],
       careDone: daily.careDone === true,
       nursingDone: daily.careDone === true && daily.nursingDone === true,
@@ -142,6 +146,7 @@ export function validateSave(data, now = Date.now()) {
   }
   pet.lastUpdatedAt = safeTimestamp(data.lastUpdatedAt, now);
   pet.streak = normalizeStreak(data.streak, now);
+  pet.quest = normalizeQuest(data.quest, questItems.map(item => item.id), now);
   pet.graduatedAt = typeof data.graduatedAt === 'string' ? safeTimestamp(data.graduatedAt, now) : null;
   normalizeFamily(pet, data, now);
   return pet;
@@ -154,7 +159,7 @@ function normalizeFamily(pet, data, now) {
     const member = record && typeof record === 'object' && validateSave({ ...record, graduates: [], familyAt: null }, now);
     if (!member || member.level !== 3 || !member.characterId || member.characterId === pet.characterId ||
       pet.graduates.some(graduate => graduate.characterId === member.characterId)) continue;
-    pet.graduates.push({ ...member, streak: newStreak(), graduatedAt: member.graduatedAt ?? member.lastUpdatedAt });
+    pet.graduates.push({ ...member, streak: newStreak(), quest: newQuest(), graduatedAt: member.graduatedAt ?? member.lastUpdatedAt });
   }
   const time = typeof data.familyAt === 'string' ? Date.parse(data.familyAt) : NaN;
   const together = pet.level === 3 && pet.graduates.length === FAMILY_SIZE - 1 && Number.isFinite(time) && time <= now;
@@ -192,11 +197,12 @@ export function loadPet(storage, now = Date.now()) {
     // Expired meal/mood timers are normal, so they only trigger a quiet re-save.
     const changedCare = ['needs','meal','mood'].some(key => JSON.stringify(data[key]) !== JSON.stringify(pet[key]));
     const correctedNeeds = data.needs !== undefined && JSON.stringify(data.needs) !== JSON.stringify(pet.needs);
-    const changedFamily = ['streak', 'graduates', 'familyAt', 'graduatedAt'].some(key => JSON.stringify(data[key]) !== JSON.stringify(pet[key]));
+    const changedFamily = ['streak', 'quest', 'graduates', 'familyAt', 'graduatedAt'].some(key => JSON.stringify(data[key]) !== JSON.stringify(pet[key]));
     const correctedFamily = (data.graduates !== undefined && (!Array.isArray(data.graduates) || data.graduates.length !== pet.graduates.length ||
       (!pet.familyAt && data.graduates.some(graduate => !graduate?.vacation?.startedAt)))) ||
       (data.familyAt !== undefined && data.familyAt !== null && data.familyAt !== pet.familyAt) ||
-      (data.streak !== undefined && JSON.stringify(data.streak) !== JSON.stringify(pet.streak));
+      (data.streak !== undefined && JSON.stringify(data.streak) !== JSON.stringify(pet.streak)) ||
+      (data.quest !== undefined && JSON.stringify(data.quest) !== JSON.stringify(pet.quest));
     const corrected = correctedFamily || correctedNeeds || (data.wardrobe !== undefined && changedWardrobe) || (data.maintenance !== undefined && changedMaintenance) || correctedCharacter || invalidAlbum || correctedVacation || correctedRoom || correctedSleep || correctedGrowth || correctedHealth || (data.daily !== undefined && (!validDaily(data.daily) || data.daily.date > koreanDate(now))) ||
       Date.parse(data.lastUpdatedAt) > now ||
       (data.lastCareAt !== undefined && (typeof data.lastCareAt !== 'string' || !Number.isFinite(Date.parse(data.lastCareAt)) || Date.parse(data.lastCareAt) > now));

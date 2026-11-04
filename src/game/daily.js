@@ -7,15 +7,19 @@ import { startNap, refreshSleep } from './sleep.js';
 import { refreshNeeds } from './needs.js';
 import { recordMeal, startMood, isFull } from './meal.js';
 import { isOnVacation, resumeVacation } from './vacation.js';
-import { currentDaily } from './time.js';
+import { currentDaily, koreanDate } from './time.js';
 import { loadPet, savePet } from './storage.js';
+import { recordChallenge, dueChallenge } from './quest.js';
 export const DAILY_LIMIT = 10;
 
 export function submitDaily(state, answer, now = Date.now()) {
   const quiz = state.quiz;
   if (isOnVacation(state.pet) || !quiz || quiz.answered || !quiz.question.options.includes(answer)) return state;
   const daily = currentDaily(state.pet, now);
-  if (daily.count >= DAILY_LIMIT || daily.submittedIds.includes(quiz.question.instanceId)) return state;
+  // Daily challenges are 3 extra questions outside the 10-question limit, each answered once.
+  const challenge = Boolean(quiz.question.challenge);
+  if (challenge && (quiz.question.challenge.date !== koreanDate(now) || dueChallenge(state.pet, now) !== quiz.question.challenge.index)) return state;
+  if (!challenge && (daily.count >= DAILY_LIMIT || daily.submittedIds.includes(quiz.question.instanceId))) return state;
   // A full pet cannot eat more, even from a quiz opened before it became full. A family eats while anyone can.
   if (quiz.action === 'hunger' && familyPets(state.pet).every(member => isFull(member,now))) return state;
   const refreshed = refreshHealth(refreshNeeds(refreshMaintenance(state.pet,now),now),now);
@@ -27,15 +31,16 @@ export function submitDaily(state, answer, now = Date.now()) {
     lastCareAt: correct ? new Date(now).toISOString() : result.pet.lastCareAt,
     daily: {
       ...daily,
-      count: daily.count + 1,
-      submittedIds: [...daily.submittedIds, quiz.question.instanceId],
+      count: daily.count + (challenge ? 0 : 1),
+      answered: (daily.answered ?? 0) + 1,
+      submittedIds: challenge ? daily.submittedIds : [...daily.submittedIds, quiz.question.instanceId],
       careActions: correct ? [...new Set([...daily.careActions,quiz.action])] : daily.careActions,
     },
   };
   const cared = !fed ? pet : quiz.action === 'hunger' ? recordMeal(pet,now) : startMood(pet,quiz.action === 'cleanliness' ? 'clean' : 'play',now);
   const maintained = correct ? recordStudyDay(recordMaintenance(cared,quiz.action,now),now) : cared;
   const grown = advanceGrowth(refreshHealth(maintained,now),now,correct);
-  const current = applyRoomCare(startNap(state.pet,grown,quiz.action,fed,now),quiz.action,fed);
+  const current = recordChallenge(applyRoomCare(startNap(state.pet,grown,quiz.action,fed,now),quiz.action,fed),quiz.question,correct,now);
   // In a family, one answer cares for everyone (each keeps its own XP and status).
   return {...result,pet:isFamily(current) ? {...current,graduates:current.graduates.map(member => answerMember(member,quiz.action,correct,now))} : current};
 }

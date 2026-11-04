@@ -15,7 +15,13 @@ export const limitedItems = [
   { id: 'medal', slot: 'clothes', name: '별 메달', limited: true },
   { id: 'rainbow', slot: 'clothes', name: '무지개 망토', limited: true },
 ];
-export const itemFor = id => shopItems.find(item => item.id === id) ?? limitedItems.find(item => item.id === id) ?? null;
+// Daily quest rewards (quest.js): exchanged for star pieces only, kept by every pet.
+export const questItems = [
+  { id: 'cloud', slot: 'headband', name: '구름 머리띠', quest: true, questPrice: 5 },
+  { id: 'clover', slot: 'clothes', name: '네잎클로버 브로치', quest: true, questPrice: 10 },
+  { id: 'starband', slot: 'headband', name: '별 조각 머리띠', quest: true, questPrice: 15 },
+];
+export const itemFor = id => [...shopItems, ...limitedItems, ...questItems].find(item => item.id === id) ?? null;
 export const newWardrobe = () => ({ owned: [], equipped: { clothes: null, headband: null } });
 export const canShop = pet => pet.level >= SHOP_LEVEL;
 
@@ -32,7 +38,7 @@ export function normalizeWardrobe(record) {
 // A purchase equips the item right away; returning the same state means "blocked".
 export function buyItem(state, itemId) {
   const item = itemFor(itemId), pet = state.pet;
-  if (!item || item.limited || !canShop(pet) || pet.wardrobe.owned.includes(itemId) || pet.totalXp < item.price) return state;
+  if (!item || item.limited || item.quest || !canShop(pet) || pet.wardrobe.owned.includes(itemId) || pet.totalXp < item.price) return state;
   return { ...state, pet: { ...pet, totalXp: pet.totalXp - item.price, wardrobe: {
     owned: [...pet.wardrobe.owned, itemId],
     equipped: { ...pet.wardrobe.equipped, [item.slot]: itemId },

@@ -10,6 +10,7 @@ import { isFull, fullRemaining, activeMood } from './game/meal.js';
 import { trashCount, SICK_CAUSES } from './game/needs.js';
 import AccountPanel from './components/AccountPanel.jsx';
 import { buyItem, equipItem, itemFor } from './game/shop.js';
+import { questStatus, dueChallenge, challengeQuestion, challengeDay, exchangeQuestItem, QUEST_SLOTS } from './game/quest.js';
 import { FamilyMember, GraduationPanel, RestingGraduates, HealthDetails } from './components/Family.jsx';
 import { isFamily, familyPets, familyCanCare, graduate, updateMember } from './game/family.js';
 import { streakStatus } from './game/streak.js';
@@ -23,7 +24,7 @@ import { actions, growth, growthStatus, refreshGrowth, isRoomMessy } from './gam
 import { sleepStatus, isActionResting } from './game/sleep.js';
 import { isOnVacation } from './game/vacation.js';
 import { healthStatus } from './game/health.js';
-import { currentDaily, nextQuizReset, nextResetLabel, formatWait } from './game/time.js';
+import { currentDaily, nextQuizReset, nextResetLabel, formatWait, daysTogether } from './game/time.js';
 import { DAILY_LIMIT, submitStored, updateStored, basicCare, setVacation } from './game/daily.js';
 import { SAVE_KEY, loadPet, savePet, resetPet, defaultPet, createPet, DEFAULT_PET_NAME, readSave, importSave, validateSave } from './game/storage.js';
 
@@ -76,6 +77,8 @@ export default function App() {
   const canCare = familyCanCare(state.pet, now);
   const anySick = members.some(member => healthStatus(member, now).sick);
   const streak = streakStatus(state.pet, now);
+  const quest = questStatus(state.pet, now);
+  const challengeDue = !onVacation && dueChallenge(state.pet, now) !== null;
   const shopIndex = Math.min(memberIndex, members.length - 1);
   const shopPet = members[shopIndex];
   // A family eats while anyone can, so feeding rests only when everyone is full or napping.
@@ -319,6 +322,12 @@ export default function App() {
       `${item.name}을(를) 구입해서 입혀 줬어요!`, 'XP가 부족하거나 이미 가진 물건이에요. 현재 상태를 확인해 주세요.');
   }
 
+  function exchange(item) {
+    if (!window.confirm(`${item.name}을(를) 별 조각 ${item.questPrice}개로 교환할까요?\n교환하면 모든 친구와 다음 세대가 함께 쓸 수 있어요.`)) return;
+    performUpdate(options => updateStored(state, current => exchangeQuestItem(current, item), options),
+      `${item.name}을(를) 받았어요!${shopPet.level < 3 ? ' 성체가 되면 입힐 수 있어요.' : ''}`, '별 조각이 부족하거나 이미 가진 물건이에요. 현재 상태를 확인해 주세요.');
+  }
+
   function equip(slot, itemId) {
     performUpdate(options => updateStored(state, current => updateMember(current, shopIndex, member => equipItem(member, slot, itemId)), options),
       itemId ? '새로 입혀 줬어요!' : '벗겨 줬어요.', '이미 바뀌었어요. 현재 상태를 확인해 주세요.');
@@ -406,12 +415,14 @@ export default function App() {
       setNotice(feedRest);
       return;
     }
-    if (currentDaily(state.pet, time).count >= DAILY_LIMIT) {
+    if (currentDaily(state.pet, time).count >= DAILY_LIMIT && dueChallenge(state.pet, time) === null) {
       setNotice(`오늘의 복습이 끝났어요! ${nextResetLabel(time)}에 다시 만나요.`);
       return;
     }
-    const question = nextQuestion(history.current);
-    history.current = [...history.current, question].slice(-5);
+    // The 1st, 4th and 7th question of the day is the day's challenge (daily quest).
+    const slot = dueChallenge(state.pet, time);
+    const question = slot === null ? nextQuestion(history.current) : challengeQuestion(questStatus(state.pet, time).date, slot);
+    if (slot === null) history.current = [...history.current, question].slice(-5);
     setState(current => ({ ...current, quiz: { question, action, answered: false } }));
   }
 
@@ -469,7 +480,13 @@ export default function App() {
     <main>
       <div className="intro">
         <span className="eyebrow">MY LITTLE CODING FRIEND</span>
-        <h1>파이썬 타마고치</h1>
+        <div className="title-row">
+          <h1>파이썬 타마고치</h1>
+          {started && <div className="met-days" aria-label="함께한 날">
+            <span className="calendar-icon" aria-hidden="true"><span>{new Date(now + 9 * 3600000).getUTCMonth() + 1}월</span><strong>{new Date(now + 9 * 3600000).getUTCDate()}</strong></span>
+            <ul>{[state.pet, ...state.pet.graduates].map(member => <li key={member.characterId ?? 'pet'}>{member.petName} 만난 지 <strong>{daysTogether(member.growth.startedAt, now)}</strong>일째</li>)}</ul>
+          </div>}
+        </div>
         <p>문제를 풀고, 나만의 작은 친구를 돌봐요.</p>
       </div>
       <AccountPanel account={account} busy={accountBusy || pending} hasPet={started} petName={state.pet.petName} syncText={syncText} onLogin={login} onSignup={signup} onLogout={logout} />
@@ -514,11 +531,12 @@ export default function App() {
         </>}
         <div className="daily-summary" role="status"><strong>지금 {daily.count} / {DAILY_LIMIT}문제</strong>{daily.count >= DAILY_LIMIT ? <span> · 오늘의 복습이 끝났어요! {nextResetLabel(now)}에 다시 만나요</span> : <span> · {nextResetLabel(now)}에 새로 충전</span>}</div>
         <div className="streak-summary" role="status"><strong>🔥 연속 학습 {streak.count}일{streak.studiedToday ? ' · 오늘 ✓' : ''}</strong><span>최고 {streak.best}일 · {streak.next ? `${streak.daysToNext}일 더 하면 ${itemFor(streak.next.itemId).name}` : '한정품을 모두 모았어요'}</span></div>
+        <div className="quest-summary" role="status"><strong>⭐ 오늘의 퀘스트 · {challengeDay(quest.date).template.title}</strong><span>{QUEST_SLOTS.map((_, i) => quest.results[i] === undefined ? '○' : quest.results[i] ? '✓' : '✕').join(' ')} · 별 조각 {quest.stars}개</span></div>
         <div className="actions">
           {Object.entries(actions).map(([action, label], index) => {
             const rest = resting(action, now);
             return <button
-              key={action} className={action} disabled={pending || onVacation || daily.count >= DAILY_LIMIT || rest} aria-describedby={rest && !family ? (full ? 'full-note' : 'sleep-note') : undefined}
+              key={action} className={action} disabled={pending || onVacation || (daily.count >= DAILY_LIMIT && !challengeDue) || rest} aria-describedby={rest && !family ? (full ? 'full-note' : 'sleep-note') : undefined}
               onClick={event => { trigger.current = event.currentTarget; openQuiz(action); }}
             ><span>{['🍙', '🧹', '🧸'][index]}</span><strong>{label}</strong><small>{onVacation ? '휴가 중' : rest ? (full ? `배불러요 · ${formatWait(fullWait)} 후` : family ? '모두 쉬는 중' : '낮잠 중') : family ? '모두 +15' : '정답이면 +15'}</small></button>;
           })}
@@ -553,7 +571,7 @@ export default function App() {
         {family && <div className="member-picker" role="group" aria-label="꾸미기와 앨범을 볼 친구">
           {members.map((member, index) => <button key={member.characterId} aria-pressed={index === shopIndex} onClick={() => setMemberIndex(index)}>{member.petName}</button>)}
         </div>}
-        <Shop pet={shopPet} pending={pending || accountBusy} onBuy={buy} onEquip={equip} />
+        <Shop pet={shopPet} stars={quest.stars} pending={pending || accountBusy} onBuy={buy} onEquip={equip} onExchange={exchange} />
         <GrowthAlbum pet={shopPet} />
         <RestingGraduates pet={state.pet} />
       </section>}
@@ -565,7 +583,7 @@ export default function App() {
     </aside>
     </div>
     <footer>{account.user ? <>{account.user.username} 계정과 이 브라우저에 자동 저장돼요<br /></> : <>이 브라우저에 자동 저장돼요{account.status === 'off' ? '' : ' · 로그인하면 다른 기기에서도 이어서 키워요'}<br /></>}<span className="credit">by.meibinlee</span></footer>
-    {state.quiz && <QuizModal quiz={state.quiz} pending={pending} limitReached={daily.count >= DAILY_LIMIT} resetLabel={nextResetLabel(now)} sleepBlocked={resting(state.quiz.action,now)} restMessage={feedRest} vacationBlocked={onVacation} family={family}
+    {state.quiz && <QuizModal quiz={state.quiz} pending={pending} limitReached={daily.count >= DAILY_LIMIT && (state.quiz.answered || !state.quiz.question.challenge) && !challengeDue} resetLabel={nextResetLabel(now)} sleepBlocked={resting(state.quiz.action,now)} restMessage={feedRest} vacationBlocked={onVacation} family={family}
       onAnswer={answer} onNext={() => openQuiz(state.quiz.action)} onClose={closeQuiz} />}
     {showGuide && <GuideDialog onClose={() => setShowGuide(false)} onTutorial={openTutorial} />}
     {showTutorial && !state.quiz && <Tutorial onClose={closeTutorial} />}

@@ -1,6 +1,7 @@
 import { characters } from '../data/characters.js';
 import { healthStatus } from './health.js';
 import { recordStudy, newStreak } from './streak.js';
+import { newQuest } from './quest.js';
 import { DAY_MS, currentDaily } from './time.js';
 import { isOnVacation, resumeVacation, vacationTime } from './vacation.js';
 
@@ -19,15 +20,15 @@ export function graduationStatus(pet, now = Date.now()) {
   return { available, remainingMs, sick, ready: available && !isOnVacation(pet) && !sick && remainingMs === 0 };
 }
 
-// `next` is a freshly created egg. The learning record (today's questions, streak) stays with the player.
+// `next` is a freshly created egg. The learning record (today's questions, streak, quests) stays with the player.
 export function graduate(state, next, now = Date.now()) {
   const pet = state.pet;
   if (!graduationStatus(pet, now).ready || !remainingCharacters(pet).some(character => character.id === next.characterId)) return state;
-  const { graduates, streak, ...rest } = pet;
-  const resting = { ...rest, streak: newStreak(), graduates: [], familyAt: null, graduatedAt: new Date(now).toISOString(), vacation: { startedAt: new Date(now).toISOString() } };
-  return { ...state, quiz: null, pet: { ...next, daily: currentDaily(pet, now), streak,
+  const { graduates, streak, quest = newQuest(), ...rest } = pet;
+  const resting = { ...rest, streak: newStreak(), quest: newQuest(), graduates: [], familyAt: null, graduatedAt: new Date(now).toISOString(), vacation: { startedAt: new Date(now).toISOString() } };
+  return { ...state, quiz: null, pet: { ...next, daily: currentDaily(pet, now), streak, quest,
     graduates: [...graduates, resting],
-    wardrobe: { ...next.wardrobe, owned: [...streak.rewards] },
+    wardrobe: { ...next.wardrobe, owned: [...streak.rewards, ...quest.items] },
   } };
 }
 

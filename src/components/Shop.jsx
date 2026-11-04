@@ -1,18 +1,26 @@
-import { SHOP_LEVEL, SLOTS, shopItems, limitedItems, canShop } from '../game/shop.js';
+import { SHOP_LEVEL, SLOTS, shopItems, limitedItems, questItems, canShop } from '../game/shop.js';
 import { STREAK_REWARDS } from '../game/streak.js';
 
 const rewardDays = id => STREAK_REWARDS.find(reward => reward.itemId === id)?.days;
 
-export default function Shop({ pet, pending = false, onBuy, onEquip }) {
+export default function Shop({ pet, stars = 0, pending = false, onBuy, onEquip, onExchange }) {
   const open = canShop(pet);
   return <section className="shop" aria-labelledby="shop-title">
     <h3 id="shop-title">꾸미기 상점</h3>
-    <p>{open ? `성장 XP로 옷과 머리띠를 살 수 있어요. 지금 ${pet.totalXp} XP가 있어요. 구입해도 성장 단계는 그대로예요.` : `Lv.${SHOP_LEVEL} 성체가 되면 성장 XP로 옷과 머리띠를 살 수 있어요.`}</p>
+    <p>{open ? `성장 XP로 옷과 머리띠를 살 수 있어요. 지금 ${pet.totalXp} XP가 있어요. 구입해도 성장 단계는 그대로예요.` : `Lv.${SHOP_LEVEL} 성체가 되면 성장 XP로 옷과 머리띠를 살 수 있어요.`} 퀘스트 상품은 별 조각 {stars}개로 언제든 교환해요.</p>
     {Object.entries(SLOTS).map(([slot, label]) => <div key={slot} className="shop-slot">
       <h4>{label}</h4>
-      <ul>{[...shopItems, ...limitedItems].filter(item => item.slot === slot).map(item => {
+      <ul>{[...shopItems, ...limitedItems, ...questItems].filter(item => item.slot === slot).map(item => {
         const owned = pet.wardrobe.owned.includes(item.id), worn = pet.wardrobe.equipped[slot] === item.id;
         const short = item.price - pet.totalXp;
+        if (item.quest) return <li key={item.id} className={`limited quest${worn ? ' worn' : owned ? ' owned' : ''}`}>
+          <img src={`${import.meta.env.BASE_URL}pets/accessories/${item.id}.svg`} alt="" width="64" height="40" />
+          <strong>{item.name}</strong>
+          <span>{worn ? '✓ 착용 중' : owned ? '퀘스트 보상' : `⭐ 별 조각 ${item.questPrice}개`}</span>
+          {owned
+            ? <button disabled={pending || !open} aria-pressed={worn} onClick={() => onEquip(slot, worn ? null : item.id)}>{!open ? '성체부터' : worn ? '벗기' : '착용하기'}</button>
+            : <button disabled={pending || stars < item.questPrice} onClick={() => onExchange(item)}>{stars < item.questPrice ? `별 ${item.questPrice - stars}개 부족` : '교환하기'}</button>}
+        </li>;
         if (item.limited) return <li key={item.id} className={`limited${worn ? ' worn' : owned ? ' owned' : ''}`}>
           <img src={`${import.meta.env.BASE_URL}pets/accessories/${item.id}.svg`} alt="" width="64" height="40" />
           <strong>{item.name}</strong>
