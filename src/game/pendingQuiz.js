@@ -26,3 +26,26 @@ export function readPending(date, storage) {
     return null;
   } catch { return null; }
 }
+
+// Recently answered questions, kept across refreshes so the question just solved is not handed out again.
+export const RECENT_KEY = 'coding-pet-recent-questions-v1';
+const RECENT_LIMIT = 10;
+
+export function readRecent(storage) {
+  try {
+    const list = JSON.parse(store(storage).getItem(RECENT_KEY));
+    return Array.isArray(list) ? list.filter(item => item && typeof item.instanceId === 'string' && typeof item.templateId === 'string' && typeof item.code === 'string').slice(-RECENT_LIMIT) : [];
+  } catch { return []; }
+}
+
+// Adds an answered question and returns the updated list (also returned when storage fails).
+export function addRecent(question, storage, list = readRecent(storage)) {
+  const { instanceId, templateId, code } = question;
+  const next = [...list.filter(item => item.instanceId !== instanceId), { instanceId, templateId, code, challenge: Boolean(question.challenge) }].slice(-RECENT_LIMIT);
+  try { store(storage).setItem(RECENT_KEY, JSON.stringify(next)); } catch { /* memory copy still avoids repeats in this tab */ }
+  return next;
+}
+
+export function clearRecent(storage) {
+  try { store(storage).removeItem(RECENT_KEY); } catch { /* nothing to clear */ }
+}

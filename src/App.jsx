@@ -26,7 +26,7 @@ import { isOnVacation } from './game/vacation.js';
 import { healthStatus } from './game/health.js';
 import { currentDaily, nextQuizReset, nextResetLabel, formatWait, daysTogether } from './game/time.js';
 import { DAILY_LIMIT, submitStored, updateStored, basicCare, setVacation } from './game/daily.js';
-import { readPending, writePending, clearPending } from './game/pendingQuiz.js';
+import { readPending, writePending, clearPending, readRecent, addRecent, clearRecent } from './game/pendingQuiz.js';
 import { SAVE_KEY, loadPet, savePet, resetPet, defaultPet, createPet, DEFAULT_PET_NAME, readSave, importSave, validateSave } from './game/storage.js';
 
 // How often a visible, signed-in window checks the account for another device's progress.
@@ -54,7 +54,8 @@ export default function App() {
   const reactionTimer = useRef(null);
   const [reaction, setReaction] = useState(null);
   const pendingReaction = useRef(null);
-  const history = useRef([]);
+  // Recently answered questions; mirrored in localStorage so a refresh does not repeat them.
+  const history = useRef(readRecent());
   const trigger = useRef(null);
   const submitting = useRef(false);
   const memoryOnly = useRef(false);
@@ -240,7 +241,6 @@ export default function App() {
     const result = importSave(save);
     if (!result) throw new Error('invalid save');
     markSynced(user, save);
-    history.current = [];
     memoryOnly.current = !result.saved;
     setState({ pet: result.pet, quiz: null });
     setStarted(!result.isNew);
@@ -337,6 +337,7 @@ export default function App() {
 
   function clearGame() {
     clearPending();
+    clearRecent();
     setStarted(false);
     setName(DEFAULT_PET_NAME);
     history.current = [];
@@ -408,7 +409,7 @@ export default function App() {
     urgentSync.current = true;
     const result = await performUpdate(options => submitStored(state, choice, options));
     const quiz = result?.state.quiz;
-    if (quiz?.answered) clearPending();
+    if (quiz?.answered) { history.current = addRecent(quiz.question, undefined, history.current); clearPending(); }
     // The second meal fills the pet: show the result briefly, then close the quiz.
     if (result && !result.blocked && quiz?.correct && quiz.action === 'hunger' && !wasFull && allFull(result.state.pet)) {
       if (result.saved) setNotice(`${isFamily(result.state.pet) ? '모두 ' : '이제 '}배불러요! ${formatWait(Math.min(...familyPets(result.state.pet).map(member => fullRemaining(member, Date.now()))))} 후에 다시 밥을 먹일 수 있어요.`);
@@ -454,11 +455,13 @@ export default function App() {
     // The 1st, 4th and 7th question of the day is the day's challenge (daily quest).
     const slot = dueChallenge(state.pet, time), date = questStatus(state.pet, time).date;
     // Reopen today's unanswered question (after a refresh or close) instead of handing out a new one.
+    const recent = readRecent();
+    if (recent.length) history.current = recent;
     const pending = readPending(date);
     const reuse = pending && !currentDaily(state.pet, time).submittedIds.includes(pending.instanceId) &&
+      !history.current.some(item => item.instanceId === pending.instanceId) &&
       (slot === null ? !pending.challenge : pending.challenge?.index === slot) ? pending : null;
-    const question = reuse ?? (slot === null ? nextQuestion(history.current) : challengeQuestion(date, slot));
-    if (!reuse && slot === null) history.current = [...history.current, question].slice(-5);
+    const question = reuse ?? (slot === null ? nextQuestion(history.current.filter(item => !item.challenge)) : challengeQuestion(date, slot));
     writePending(question, date);
     setState(current => ({ ...current, quiz: { question, action, answered: false } }));
   }

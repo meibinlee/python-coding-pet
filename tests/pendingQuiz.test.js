@@ -48,3 +48,20 @@ it('keeps the newer charge period from this browser',()=>{
   const local=withDaily({period:13,count:1,answered:12,submittedIds:['k']});
   expect(keepDailyProgress(cloud,local).daily).toMatchObject({period:13,count:1,answered:12,submittedIds:['k']});
 });
+
+it('remembers answered questions across reloads and never repeats the last pattern',async()=>{
+  const { readRecent, addRecent, clearRecent } = await import('../src/game/pendingQuiz.js');
+  const store=memory();
+  let rng=1;const next=()=>{rng=(1664525*rng+1013904223)>>>0;return rng/4294967296;};
+  let previous=null;
+  for(let i=0;i<300;i++){
+    // Every question starts from a fresh "page load": only storage carries the history.
+    const recent=readRecent(store), q=nextQuestion(recent,next);
+    if(previous)expect(q.templateId).not.toBe(previous.templateId);
+    expect(recent.some(item=>item.templateId===q.templateId&&item.code===q.code)).toBe(false);
+    addRecent(q,store);previous=q;
+  }
+  expect(readRecent(store)).toHaveLength(10);
+  clearRecent(store);
+  expect(readRecent(store)).toEqual([]);
+});

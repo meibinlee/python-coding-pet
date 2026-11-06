@@ -20,12 +20,13 @@ export function generateQuestion(template, rng = Math.random) {
   return {...data, instanceId:globalThis.crypto?.randomUUID?.() ?? `q-${Date.now()}-${++sequence}`, templateId:template.id,category:template.category,difficulty:template.difficulty,options:makeOptions(data.correctAnswer,rng)};
 }
 export function nextQuestion(history=[],rng=Math.random) {
-  const last=history.slice(-2);
-  const pool=last.length===2&&last[0].templateId===last[1].templateId?questionTemplates.filter(t=>t.id!==last[0].templateId):questionTemplates;
+  // Never the same pattern as the question just answered (so it cannot look repeated), nor recent identical code.
+  const previous=history.at(-1)?.templateId;
+  const pool=questionTemplates.filter(t=>t.id!==previous);
   let question;
   for(let attempt=0;attempt<=10;attempt++) {
     question=generateQuestion(pool[Math.floor(rng()*pool.length)],rng);
-    if(!history.slice(-5).some(q=>q.templateId===question.templateId&&q.code===question.code)) break;
+    if(!history.slice(-10).some(q=>q.templateId===question.templateId&&q.code===question.code)) break;
   }
   return question;
 }
