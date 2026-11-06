@@ -7,6 +7,8 @@
 - 동기화: 로그인 중 화면이 보이면 30초마다(`SYNC_POLL_MS`), 그리고 페이지 복귀·네트워크 재연결 때 계정 기록 확인. 답 제출은 즉시 계정 저장(퀴즈가 열려 있어도 업로드). 다른 기기 기록을 내려받을 때 오늘 이 브라우저에서 더 많이 답한 기록은 유지(`keepDailyProgress`).
 - 새로고침 문제 고정: 출제한 문제를 `coding-pet-pending-quiz-v1`에 저장(`src/game/pendingQuiz.js`). 답하기 전 닫기·새로고침 후 어느 버튼으로 열어도 같은 문제. 답하면 지움. 초기화·로그아웃 때도 지움.
 - 검증: Vitest 253개 통과(새 테스트 `tests/pendingQuiz.test.js`), 두 빌드 통과. 로컬 헤드리스 브라우저(390px)에서 로그인 버튼 표시·창 열기/닫기, 문제 연 뒤 새로고침→다른 버튼으로 열어도 같은 문제, 답한 뒤 새로고침→다음 문제 확인. 실제 Supabase 가입·로그인·기기 간 30초 반영은 배포 후 사용자 확인 필요.
+- 배포: 커밋 `c42e45a` 푸시, [CI](https://github.com/meibinlee/python-coding-pet/actions/runs/42201207069)·[Pages 배포](https://github.com/meibinlee/python-coding-pet/actions/runs/42201241617) 성공. 공개 페이지 JS에 새 로그인 버튼·문제 고정 코드 포함 확인. 윈도우 PC에서는 git 저장 인증으로 GitHub API를 호출해 배포 워크플로를 실행했다.
+- 다음 할 일: 학생 사용 후 로그인 버튼 발견 여부·기기 간 반영 속도·문제 고정 동작 확인. 나머지는 NEXT_DEVELOPMENT_PLAN.md "다음에 할 일".
 
 ## 2026-11-04 (3) — v2.2 버전 정리
 
