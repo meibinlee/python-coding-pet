@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { credentialError, PASSWORD_MIN } from '../game/account.js';
 
 function PasswordField({ id, label, value, onChange, autoComplete }) {
@@ -65,4 +65,39 @@ export default function AccountPanel({ account, busy = false, hasPet = false, pe
       </div>
     </form>}
   </section>;
+}
+
+// Header button: bright and labeled so students spot it; the panel opens in a dialog.
+export function AccountButton(props) {
+  const { account } = props;
+  const [open, setOpen] = useState(false);
+  const dialog = useRef(null);
+  const userId = account.user?.id ?? null;
+  const seenUser = useRef(userId);
+  useEffect(() => {
+    // Close once login, signup or logout has changed who is signed in.
+    if (seenUser.current !== userId) { seenUser.current = userId; setOpen(false); }
+  }, [userId]);
+  useEffect(() => {
+    const el = dialog.current;
+    if (!el) return;
+    if (open && !el.open) el.showModal();
+    if (!open && el.open) el.close();
+  }, [open]);
+
+  if (account.status === 'off') return null;
+  const user = account.user;
+  const checking = account.status === 'checking';
+  const label = checking ? '확인 중…' : user ? user.username : '로그인';
+  return <>
+    <button className={`account-open ${user ? 'signed-in' : 'guest'}`} disabled={checking} onClick={() => setOpen(true)}
+      aria-haspopup="dialog" aria-label={user ? `${user.username} 계정 (로그인됨)` : '로그인 또는 회원가입'} title={user ? '내 계정' : '로그인 · 회원가입'}>
+      <span aria-hidden="true">{user ? '✓' : '👤'}</span><span className="account-open-label">{label}</span>
+    </button>
+    <dialog ref={dialog} className="account-dialog" aria-labelledby="account-dialog-title" onCancel={event => { event.preventDefault(); setOpen(false); }}
+      onClick={event => { if (event.target === dialog.current) setOpen(false); }}>
+      <div className="modal-top"><h2 id="account-dialog-title">{user ? '내 계정' : '로그인 · 회원가입'}</h2><button onClick={() => setOpen(false)} aria-label="계정 창 닫기">✕</button></div>
+      {open && <AccountPanel {...props} />}
+    </dialog>
+  </>;
 }

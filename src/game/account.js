@@ -64,6 +64,25 @@ export function syncAction({ localSave, cloudSave, syncedAt, localChanged, acted
   return updatedAt(cloudSave) >= updatedAt(localSave) ? 'download' : 'upload';
 }
 
+// When another device's save replaces this one, keep today's questions already answered here
+// so a download cannot hand the same questions out again. Returns the cloud save itself when nothing changes.
+export function keepDailyProgress(cloudSave, localSave) {
+  const cd = cloudSave?.daily, ld = localSave?.daily;
+  if (!cd || !ld || cd.date !== ld.date || !((ld.answered ?? 0) > (cd.answered ?? 0))) return cloudSave;
+  const daily = { ...cd, answered: ld.answered };
+  if ((ld.period ?? 0) > (cd.period ?? 0) || ((ld.period ?? 0) === (cd.period ?? 0) && ld.count > cd.count)) {
+    Object.assign(daily, { period: ld.period, count: ld.count, submittedIds: [...ld.submittedIds] });
+  }
+  const cq = cloudSave.quest, lq = localSave.quest;
+  let quest = cq;
+  if (cq && lq?.date === ld.date && (cq.date !== lq.date || lq.results.length > cq.results.length)) {
+    const old = cq.date === lq.date ? cq.results : [];
+    const extraStars = lq.results.slice(old.length).filter(Boolean).length;
+    quest = { ...cq, date: lq.date, results: [...lq.results], stars: cq.stars + extraStars };
+  }
+  return { ...cloudSave, daily, quest };
+}
+
 // Which account this browser's save belongs to, the save time last synced, and whether
 // the player acted here since then. Shared by all tabs of this browser so one tab's
 // upload is not mistaken for another device.

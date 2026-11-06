@@ -8,13 +8,13 @@ import Shop from './components/Shop.jsx';
 import { GuideDialog, Tutorial } from './components/Guide.jsx';
 import { isFull, fullRemaining, activeMood } from './game/meal.js';
 import { trashCount, SICK_CAUSES } from './game/needs.js';
-import AccountPanel from './components/AccountPanel.jsx';
+import { AccountButton } from './components/AccountPanel.jsx';
 import { buyItem, equipItem, itemFor } from './game/shop.js';
 import { questStatus, dueChallenge, challengeQuestion, challengeDay, exchangeQuestItem, QUEST_SLOTS } from './game/quest.js';
 import { FamilyMember, GraduationPanel, RestingGraduates, HealthDetails } from './components/Family.jsx';
 import { isFamily, familyPets, familyCanCare, graduate, updateMember } from './game/family.js';
 import { streakStatus } from './game/streak.js';
-import { resolveLogin, cloudChangedElsewhere, syncAction, readOwner, writeOwner, clearOwner, saveTime, markActed } from './game/account.js';
+import { resolveLogin, cloudChangedElsewhere, syncAction, keepDailyProgress, readOwner, writeOwner, clearOwner, saveTime, markActed } from './game/account.js';
 import { cloudConfigured, cloudMessage, currentUser, signUp, signIn, signOut, fetchCloudSave, pushCloudSave, deleteCloudSave } from './game/cloud.js';
 import { characterImage, characterFor } from './data/characters.js';
 import { selectCharacter } from './game/album.js';
@@ -26,7 +26,11 @@ import { isOnVacation } from './game/vacation.js';
 import { healthStatus } from './game/health.js';
 import { currentDaily, nextQuizReset, nextResetLabel, formatWait, daysTogether } from './game/time.js';
 import { DAILY_LIMIT, submitStored, updateStored, basicCare, setVacation } from './game/daily.js';
+import { readPending, writePending, clearPending } from './game/pendingQuiz.js';
 import { SAVE_KEY, loadPet, savePet, resetPet, defaultPet, createPet, DEFAULT_PET_NAME, readSave, importSave, validateSave } from './game/storage.js';
+
+// How often a visible, signed-in window checks the account for another device's progress.
+const SYNC_POLL_MS = 30_000;
 
 const TILE_LABELS = { hunger: '먹이', cleanliness: '청소', affection: '놀이' };
 const SAVE_WARNING = '자동 저장에 실패했어요. 이 창을 닫으면 기록이 사라질 수 있어요.';
@@ -65,6 +69,7 @@ export default function App() {
   const lastPushed = useRef('');
   const [syncTick, setSyncTick] = useState(0);
   const pulledTick = useRef(0);
+  const urgentSync = useRef(false);
   const stage = growth(state.pet.totalXp, state.pet.level);
   const growthProgress = growthStatus(state.pet, now);
   const remainingTime = formatWait(growthProgress.remainingMs);
@@ -169,23 +174,32 @@ export default function App() {
   useEffect(() => {
     const user = account.user;
     if (!user || !started) return;
+    // An answer is saved to the account right away so a quick refresh or device switch cannot undo it.
+    const delay = urgentSync.current ? 0 : 1500;
+    urgentSync.current = false;
     const timer = setTimeout(async () => {
-      // Skip while a quiz or update is open; the next state change retries.
-      if (submitting.current || stateRef.current.quiz) return;
+      // Skip while an update is running; the next state change retries.
+      if (submitting.current) return;
       const save = localPayload();
       const text = save && JSON.stringify(save);
       const localChanged = Boolean(save) && text !== lastPushed.current;
-      // Unchanged here: only look for another device's progress when the window regains focus.
+      // With a quiz open, only upload this browser's progress; downloads wait until it closes.
+      if (stateRef.current.quiz && !localChanged) return;
+      // Unchanged here: only look for another device's progress on focus or the periodic check.
       const pull = syncTick !== pulledTick.current;
       pulledTick.current = syncTick;
       if (!save || (!localChanged && !pull)) return;
       try {
         const cloud = await fetchCloudSave(user.id);
-        if (userRef.current?.id !== user.id || submitting.current || stateRef.current.quiz) return;
+        if (userRef.current?.id !== user.id || submitting.current) return;
         if (cloud && JSON.stringify(cloud) === text) { markSynced(user, cloud); return; }
         const action = syncAction({ localSave: save, cloudSave: cloud && validateSave(cloud) ? cloud : null, syncedAt: readOwner()?.syncedAt, localChanged, acted: readOwner()?.acted });
         if (action === 'download') {
-          download(user, cloud);
+          if (stateRef.current.quiz) { pulledTick.current = -1; return; }
+          // Never bring back questions this browser already answered today.
+          const merged = keepDailyProgress(cloud, save);
+          download(user, merged);
+          if (merged !== cloud) { urgentSync.current = true; lastPushed.current = ''; }
           setNotice('다른 기기에서 진행한 더 최근 기록을 불러왔어요.');
           return;
         }
@@ -201,9 +215,11 @@ export default function App() {
 
   useEffect(() => {
     const bump = () => { if (document.visibilityState !== 'hidden') setSyncTick(tick => tick + 1); };
-    window.addEventListener('focus', bump);
-    document.addEventListener('visibilitychange', bump);
-    return () => { window.removeEventListener('focus', bump); document.removeEventListener('visibilitychange', bump); };
+    const events = [[window, 'focus'], [document, 'visibilitychange'], [window, 'pageshow'], [window, 'online']];
+    events.forEach(([target, name]) => target.addEventListener(name, bump));
+    // A window left open never regains focus, so also check the account on a timer while it is visible.
+    const timer = setInterval(bump, SYNC_POLL_MS);
+    return () => { events.forEach(([target, name]) => target.removeEventListener(name, bump)); clearInterval(timer); };
   }, []);
 
   function localPayload() {
@@ -320,6 +336,7 @@ export default function App() {
   }
 
   function clearGame() {
+    clearPending();
     setStarted(false);
     setName(DEFAULT_PET_NAME);
     history.current = [];
@@ -388,8 +405,10 @@ export default function App() {
   async function answer(choice) {
     const allFull = pet => familyPets(pet).every(member => isFull(member, Date.now()));
     const wasFull = allFull(state.pet), rewards = state.pet.streak.rewards;
+    urgentSync.current = true;
     const result = await performUpdate(options => submitStored(state, choice, options));
     const quiz = result?.state.quiz;
+    if (quiz?.answered) clearPending();
     // The second meal fills the pet: show the result briefly, then close the quiz.
     if (result && !result.blocked && quiz?.correct && quiz.action === 'hunger' && !wasFull && allFull(result.state.pet)) {
       if (result.saved) setNotice(`${isFamily(result.state.pet) ? '모두 ' : '이제 '}배불러요! ${formatWait(Math.min(...familyPets(result.state.pet).map(member => fullRemaining(member, Date.now()))))} 후에 다시 밥을 먹일 수 있어요.`);
@@ -433,9 +452,14 @@ export default function App() {
       return;
     }
     // The 1st, 4th and 7th question of the day is the day's challenge (daily quest).
-    const slot = dueChallenge(state.pet, time);
-    const question = slot === null ? nextQuestion(history.current) : challengeQuestion(questStatus(state.pet, time).date, slot);
-    if (slot === null) history.current = [...history.current, question].slice(-5);
+    const slot = dueChallenge(state.pet, time), date = questStatus(state.pet, time).date;
+    // Reopen today's unanswered question (after a refresh or close) instead of handing out a new one.
+    const pending = readPending(date);
+    const reuse = pending && !currentDaily(state.pet, time).submittedIds.includes(pending.instanceId) &&
+      (slot === null ? !pending.challenge : pending.challenge?.index === slot) ? pending : null;
+    const question = reuse ?? (slot === null ? nextQuestion(history.current) : challengeQuestion(date, slot));
+    if (!reuse && slot === null) history.current = [...history.current, question].slice(-5);
+    writePending(question, date);
     setState(current => ({ ...current, quiz: { question, action, answered: false } }));
   }
 
@@ -486,6 +510,7 @@ export default function App() {
     <header>
       <a href="./" className="brand"><img className="brand-icon" src={`${import.meta.env.BASE_URL}favicon.svg?v=rabbit1`} width="38" height="38" alt="" /> 파이썬 타마고치</a>
       <div className="header-actions">
+        <AccountButton account={account} busy={accountBusy || pending} hasPet={started} petName={state.pet.petName} syncText={syncText} onLogin={login} onSignup={signup} onLogout={logout} />
         <button className="guide-open icon-button" onClick={() => setShowGuide(true)} aria-label="사용방법" title="사용방법">?</button>
         <button className="reset icon-button" disabled={pending || accountBusy} onClick={reset} aria-label="초기화" title="초기화">↻</button>
       </div>
@@ -497,7 +522,6 @@ export default function App() {
         <span className="pill" aria-label={daily.count >= DAILY_LIMIT ? `${nextResetLabel(now)}에 새 문제` : `남은 문제 ${DAILY_LIMIT - daily.count}개`}>{daily.count >= DAILY_LIMIT ? `🌙 ${nextResetLabel(now)}` : `✏️ ${DAILY_LIMIT - daily.count}/${DAILY_LIMIT}`}</span>
         {[state.pet, ...state.pet.graduates].map(member => <span className="pill" key={member.characterId ?? 'pet'}>📅 {member.petName} 만난 지 {daysTogether(member.growth.startedAt, now)}일째</span>)}
       </div>}
-      <AccountPanel account={account} busy={accountBusy || pending} hasPet={started} petName={state.pet.petName} syncText={syncText} onLogin={login} onSignup={signup} onLogout={logout} />
       {!started ? <form className="welcome card" onSubmit={start}>
         <img src={characterImage(character,1,'normal',import.meta.env.BASE_URL)} alt={`${characterFor(character).name} 알 모습`} className="welcome-egg" />
         <h2>우리 처음 만났네!</h2>
