@@ -6,6 +6,7 @@
 - 캐릭터: 기존 파일명 유지하며 덮어씀(idle→normal, happy, cleaning→clean, eating→hungry, playing→play, sleeping→sleep, 알 happy→normal·sleepy→sleep). 1254px → 256px, 이미지 용량 34MB → 1.2MB. 먹이 반응은 이제 먹는 그림(`hungry`)을 보여 줌. 이미지 주소에 `?v=ART_VERSION`.
 - 액세서리: SVG 12개 삭제, PNG 13장(망토 앞 여밈 포함). 묶음의 `accessory_layout.json` 배치가 기준점 계산식과 일치(468개 오차 0.005px 이내)함을 확인하고, 성체 18개 자세의 기준점만 `src/data/characters.js`에 넣어 `accessoryPieces()`로 계산. 무지개(무지개 머리핀)·네잎클로버(네잎클로버 머리핀)는 그림이 머리핀이라 머리띠 칸으로 이동.
 - 검증: Vitest 255개 통과, 빌드 통과. 로컬에서 성체 우사기 왕관+망토 화면, 3캐릭터×6자세 착용 모음, 상점 미리보기 확인.
+- 배포: `55659ef`(초기화 버튼)·`d86c72f`(그림 교체) 푸시(사용자 실행), [CI](https://github.com/meibinlee/python-coding-pet/actions/runs/42617332270)·[Pages 배포](https://github.com/meibinlee/python-coding-pet/actions/runs/42617358086) 성공. 공개 페이지 JS에 `펫 초기화`·`무지개 머리핀`·`cape_front` 포함, 새 PNG(성체 우사기 24KB, 망토 여밈) 200 응답 확인.
 
 ## 2026-11-09 — 로그인 후 초기화 신고 조사·초기화 버튼 변경·두 학생 복구
 
