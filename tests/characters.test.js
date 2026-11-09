@@ -1,6 +1,7 @@
 import { it, expect } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
-import { characters, characterImage, characterFor, petMood, accessoryAnchor } from '../src/data/characters.js';
+import { characters, characterImage, characterFor, petMood, accessoryPieces, ART_VERSION } from '../src/data/characters.js';
+import { shopItems, limitedItems, questItems } from '../src/game/shop.js';
 import { createPet, defaultPet, savePet, loadPet, SAVE_KEY } from '../src/game/storage.js';
 import { selectCharacter } from '../src/game/album.js';
 import { updateStored } from '../src/game/daily.js';
@@ -21,8 +22,8 @@ it('maps all 42 supplied and generated images to existing PNG files with portabl
   expect(count).toBe(42);
 });
 it('uses the requested mood when supplied and stage-specific normal fallback for missing moods',()=>{
-  expect(characterImage('chiikawa',3,'sleep','/app/')).toBe('/app/pets/characters/chiikawa/adult-sleep.png');
-  expect(characterImage('usagi',3,'sleep','/app/')).toBe('/app/pets/characters/usagi/adult-sleep.png');
+  expect(characterImage('chiikawa',3,'sleep','/app/')).toBe(`/app/pets/characters/chiikawa/adult-sleep.png?v=${ART_VERSION}`);
+  expect(characterImage('usagi',3,'sleep','/app/')).toBe(`/app/pets/characters/usagi/adult-sleep.png?v=${ART_VERSION}`);
   expect(characterImage('hachiware',2,'sleep')).toContain('baby-sleep.png');
   expect(characterImage('usagi',1,'happy')).toContain('egg-normal.png');
   expect(characterImage('unknown',2)).toBe('./pets/baby.svg');
@@ -31,7 +32,7 @@ it('uses the requested mood when supplied and stage-specific normal fallback for
 it('prioritizes sleep, care and hunger consistently when resolving appearance',()=>{
   const pet={...defaultPet(now),hunger:10,affection:100};
   expect(petMood(pet)).toBe('hungry');expect(petMood(pet,{petted:true})).toBe('happy');
-  expect(petMood(pet,{playing:true})).toBe('play');expect(petMood(pet,{cleaning:true})).toBe('clean');
+  expect(petMood(pet,{playing:true})).toBe('play');expect(petMood({...pet,hunger:90},{eating:true})).toBe('hungry');expect(petMood(pet,{cleaning:true})).toBe('clean');
   expect(petMood(pet,{sleeping:true,sick:true,cleaning:true})).toBe('sleep');
   expect(petMood(pet,{vacation:true})).toBe('normal');
 });
@@ -73,16 +74,19 @@ it('provides a sleeping image for every character and growth stage',()=>{
     expect(characterImage(character.id,index+1,'sleep')).toContain(`${stage}-sleep.png`);
   }
 });
-it('fits accessories to each character and to poses that move the head or body',()=>{
-  const normal=accessoryAnchor('usagi','normal');
-  expect(normal).toMatchObject({headX:50,neckX:50,neck:69,capeX:50,capeTop:65,neckRot:0});
-  expect(accessoryAnchor('usagi','play')).toMatchObject({headX:45,neckX:43,capeX:43,clothesWidth:48,headWidth:48});
-  const sleep=accessoryAnchor('chiikawa','sleep');
-  expect(sleep).toMatchObject({headRot:-15,neckRot:-70,capeRot:0,capeTop:55});
-  expect(accessoryAnchor('chiikawa','unknown')).toEqual(accessoryAnchor('chiikawa','normal'));
-  expect(accessoryAnchor('nobody','normal')).toBeNull();
-  for(const id of ['chiikawa','hachiware','usagi'])for(const mood of ['normal','happy','hungry','play','clean','sleep']){
-    const a=accessoryAnchor(id,mood);
-    for(const key of ['headTop','headX','headWidth','neck','neckX','clothesWidth','capeX','capeTop','capeWidth'])expect(a[key]).toBeGreaterThan(0);
+it('places the supplied pixel accessories with the pack layout for every adult pose',()=>{
+  const pct=v=>Number.parseFloat(v);
+  const near=(piece,[x,y,w,h])=>{expect(pct(piece.left)).toBeCloseTo(x,1);expect(pct(piece.top)).toBeCloseTo(y,1);expect(pct(piece.width)).toBeCloseTo(w,1);expect(pct(piece.height)).toBeCloseTo(h,1);};
+  // Reference values from reference_img/pixel_accessories_12/accessory_layout.json.
+  near(accessoryPieces('usagi','normal','crown')[0],[34.85,17.57,29.14,29.14]);
+  near(accessoryPieces('chiikawa','sleep','cape')[0],[10.79,45.34,77.24,48.38]);
+  near(accessoryPieces('hachiware','play','medal')[0],[38.27,64.0,23.5,23.5]);
+  expect(accessoryPieces('usagi','sleep','cape').map(p=>[p.id,p.layer])).toEqual([['cape','back'],['cape_front','front']]);
+  expect(accessoryPieces('usagi','unknown','crown')).toEqual(accessoryPieces('usagi','normal','crown'));
+  expect(accessoryPieces('nobody','normal','crown')).toEqual([]);
+  expect(accessoryPieces('usagi','normal','nothing')).toEqual([]);
+  for(const item of [...shopItems,...limitedItems,...questItems])for(const id of ['chiikawa','hachiware','usagi'])for(const mood of ['normal','happy','hungry','play','clean','sleep']){
+    const pieces=accessoryPieces(id,mood,item.id);expect(pieces.length).toBeGreaterThan(0);
+    for(const piece of pieces){expect(existsSync(`public/pets/accessories/${piece.id}.png`)).toBe(true);expect(pct(piece.width)).toBeGreaterThan(5);}
   }
 });

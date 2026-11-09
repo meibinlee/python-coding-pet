@@ -1,5 +1,12 @@
 # 개발 진행 기록
 
+## 2026-11-09 (2) — 캐릭터·액세서리 픽셀 그림 교체
+
+- 사용자 요청: `reference_img/`의 새 그림(치이카와·하치와레·우사기 각 14장, 픽셀 액세서리 12종)으로 교체.
+- 캐릭터: 기존 파일명 유지하며 덮어씀(idle→normal, happy, cleaning→clean, eating→hungry, playing→play, sleeping→sleep, 알 happy→normal·sleepy→sleep). 1254px → 256px, 이미지 용량 34MB → 1.2MB. 먹이 반응은 이제 먹는 그림(`hungry`)을 보여 줌. 이미지 주소에 `?v=ART_VERSION`.
+- 액세서리: SVG 12개 삭제, PNG 13장(망토 앞 여밈 포함). 묶음의 `accessory_layout.json` 배치가 기준점 계산식과 일치(468개 오차 0.005px 이내)함을 확인하고, 성체 18개 자세의 기준점만 `src/data/characters.js`에 넣어 `accessoryPieces()`로 계산. 무지개(무지개 머리핀)·네잎클로버(네잎클로버 머리핀)는 그림이 머리핀이라 머리띠 칸으로 이동.
+- 검증: Vitest 255개 통과, 빌드 통과. 로컬에서 성체 우사기 왕관+망토 화면, 3캐릭터×6자세 착용 모음, 상점 미리보기 확인.
+
 ## 2026-11-09 — 로그인 후 초기화 신고 조사·초기화 버튼 변경·두 학생 복구
 
 - 신고: 우사기 성체였던 학생 2명(`grace1122`, `baronkk_0911`)이 로그인 후 초기화됐다고 함.

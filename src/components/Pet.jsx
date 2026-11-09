@@ -1,4 +1,4 @@
-import { characterImage, characterFor, petMood, accessoryAnchor } from '../data/characters.js';
+import { characterImage, characterFor, petMood, accessoryPieces, ART_VERSION } from '../data/characters.js';
 import { SHOP_LEVEL, itemFor } from '../game/shop.js';
 import { useEffect, useRef, useState } from 'react';
 
@@ -38,23 +38,20 @@ export default function Pet({ pet, stage, limitReached = false, sick = false, si
     : pet.affection >= 85 ? '네가 와서 기뻐!'
     : '함께 코딩할래?';
 
-  const mood = petMood(pet,{sleeping:sleeping || dozing,cleaning,sick,vacation,playing,petted:petted || eating});
+  const mood = petMood(pet,{sleeping:sleeping || dozing,cleaning,sick,vacation,playing,eating,petted});
   const src = characterImage(pet.characterId,stage.level,mood,import.meta.env.BASE_URL);
-  const anchor = accessoryAnchor(pet.characterId, mood);
-  const worn = stage.level >= SHOP_LEVEL && anchor ? ['clothes','headband'].map(slot => itemFor(pet.wardrobe?.equipped?.[slot])).filter(Boolean) : [];
+  const worn = stage.level >= SHOP_LEVEL && characterFor(pet.characterId) ? ['clothes','headband'].map(slot => itemFor(pet.wardrobe?.equipped?.[slot])).filter(Boolean) : [];
+  const pieces = worn.flatMap(item => accessoryPieces(pet.characterId, mood, item.id));
   const wornText = worn.length ? `, ${worn.map(item => item.name).join('·')} 착용` : '';
   return <div className={`pet-scene${cleaning ? ' room-cleaning' : ''}`}>
     <span className="spark s1" aria-hidden="true">✧</span>
     <span className="spark s2" aria-hidden="true">✦</span>
     <div className="bubble" role="status">{message}</div>
     <button className={`pet-button${petted ? ' petted' : ''}${sick ? ' sick-pet' : ''}${sleeping || dozing ? ' sleeping-pet' : ''}${vacation ? ' vacation-pet' : ''}`} onClick={petFriend} aria-label={`${pet.petName} 쓰다듬기`}>
-      <span className="pet-figure" style={anchor ? {
-        '--head-top': `${anchor.headTop}%`, '--head-x': `${anchor.headX}%`, '--head-width': `${anchor.headWidth}%`, '--head-rot': `${anchor.headRot}deg`,
-        '--neck': `${anchor.neck}%`, '--neck-x': `${anchor.neckX}%`, '--clothes-width': `${anchor.clothesWidth}%`, '--neck-rot': `${anchor.neckRot}deg`,
-        '--cape-top': `${anchor.capeTop}%`, '--cape-x': `${anchor.capeX}%`, '--cape-width': `${anchor.capeWidth}%`, '--cape-rot': `${anchor.capeRot}deg`,
-      } : undefined}>
+      <span className="pet-figure">
         <img className="pet" src={src} alt={`${characterFor(pet.characterId)?.name ?? '친구'} · ${stage.name} 모습의 ${pet.petName}${wornText}`} width="210" height="210" />
-        {worn.map(item => <img key={item.id} className={`accessory acc-${item.slot} acc-${item.id}`} src={`${import.meta.env.BASE_URL}pets/accessories/${item.id}.svg`} alt="" aria-hidden="true" />)}
+        {pieces.map(piece => <img key={piece.id} className={`accessory acc-${piece.layer}`} style={{ left: piece.left, top: piece.top, width: piece.width, height: piece.height }}
+          src={`${import.meta.env.BASE_URL}pets/accessories/${piece.id}.png?v=${ART_VERSION}`} alt="" aria-hidden="true" />)}
       </span>
       {(sleeping || dozing) && <span className="sleep-mark" aria-hidden="true">Zzz</span>}
       {sick && <span className="pet-bandage" aria-hidden="true">✚</span>}

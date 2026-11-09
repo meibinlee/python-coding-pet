@@ -13,12 +13,12 @@ export const shopItems = [
 export const limitedItems = [
   { id: 'sprout', slot: 'headband', name: '새싹 머리띠', limited: true },
   { id: 'medal', slot: 'clothes', name: '별 메달', limited: true },
-  { id: 'rainbow', slot: 'clothes', name: '무지개 망토', limited: true },
+  { id: 'rainbow', slot: 'headband', name: '무지개 머리핀', limited: true },
 ];
 // Daily quest rewards (quest.js): exchanged for star pieces only, kept by every pet.
 export const questItems = [
   { id: 'cloud', slot: 'headband', name: '구름 머리띠', quest: true, questPrice: 5 },
-  { id: 'clover', slot: 'clothes', name: '네잎클로버 브로치', quest: true, questPrice: 10 },
+  { id: 'clover', slot: 'headband', name: '네잎클로버 머리핀', quest: true, questPrice: 10 },
   { id: 'starband', slot: 'headband', name: '별 조각 머리띠', quest: true, questPrice: 15 },
 ];
 export const itemFor = id => [...shopItems, ...limitedItems, ...questItems].find(item => item.id === id) ?? null;

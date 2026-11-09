@@ -1,5 +1,6 @@
 import { SHOP_LEVEL, SLOTS, shopItems, limitedItems, questItems, canShop } from '../game/shop.js';
 import { STREAK_REWARDS } from '../game/streak.js';
+import { ART_VERSION } from '../data/characters.js';
 
 const rewardDays = id => STREAK_REWARDS.find(reward => reward.itemId === id)?.days;
 
@@ -14,7 +15,7 @@ export default function Shop({ pet, stars = 0, pending = false, onBuy, onEquip, 
         const owned = pet.wardrobe.owned.includes(item.id), worn = pet.wardrobe.equipped[slot] === item.id;
         const short = item.price - pet.totalXp;
         if (item.quest) return <li key={item.id} className={`limited quest${worn ? ' worn' : owned ? ' owned' : ''}`}>
-          <img src={`${import.meta.env.BASE_URL}pets/accessories/${item.id}.svg`} alt="" width="64" height="40" />
+          <img src={`${import.meta.env.BASE_URL}pets/accessories/${item.id}.png?v=${ART_VERSION}`} alt="" width="56" height="56" />
           <strong>{item.name}</strong>
           <span>{worn ? '✓ 착용 중' : owned ? '퀘스트 보상' : `⭐ 별 조각 ${item.questPrice}개`}</span>
           {owned
@@ -22,7 +23,7 @@ export default function Shop({ pet, stars = 0, pending = false, onBuy, onEquip, 
             : <button disabled={pending || stars < item.questPrice} onClick={() => onExchange(item)}>{stars < item.questPrice ? `별 ${item.questPrice - stars}개 부족` : '교환하기'}</button>}
         </li>;
         if (item.limited) return <li key={item.id} className={`limited${worn ? ' worn' : owned ? ' owned' : ''}`}>
-          <img src={`${import.meta.env.BASE_URL}pets/accessories/${item.id}.svg`} alt="" width="64" height="40" />
+          <img src={`${import.meta.env.BASE_URL}pets/accessories/${item.id}.png?v=${ART_VERSION}`} alt="" width="56" height="56" />
           <strong>{item.name}</strong>
           <span>{worn ? '✓ 착용 중' : owned ? '연속 학습 보상' : `🔥 연속 ${rewardDays(item.id)}일 보상`}</span>
           {owned
@@ -30,7 +31,7 @@ export default function Shop({ pet, stars = 0, pending = false, onBuy, onEquip, 
             : <button disabled>연속 {rewardDays(item.id)}일 달성 시</button>}
         </li>;
         return <li key={item.id} className={worn ? 'worn' : owned ? 'owned' : ''}>
-          <img src={`${import.meta.env.BASE_URL}pets/accessories/${item.id}.svg`} alt="" width="64" height="40" />
+          <img src={`${import.meta.env.BASE_URL}pets/accessories/${item.id}.png?v=${ART_VERSION}`} alt="" width="56" height="56" />
           <strong>{item.name}</strong>
           <span>{worn ? '✓ 착용 중' : owned ? '보유 중' : `${item.price} XP`}</span>
           {owned

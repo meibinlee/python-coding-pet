@@ -31,7 +31,7 @@
 - `src/game/cloud.js`: Supabase 호출(환경변수 없으면 비활성). `supabase/schema.sql`: 테이블·RLS.
 - `src/components/`: 펫/상태막대/문제 모달.
 - `src/App.jsx`: 상태 연결, 화면 구성, 중복 보상 통제.
-- `public/pets/`: 사용자 제공 캐릭터 PNG·수면 파생 이미지와 자체 SVG 대체 이미지, `accessories/`의 자체 제작 액세서리 SVG 12개(판매 6개, 한정품 3개, 퀘스트 상품 3개). 외부 캐릭터 무단 추가 금지.
+- `public/pets/`: 사용자 제공 256px 픽셀 캐릭터 PNG(캐릭터당 14장, 2026-11-09 교체, 원본 `reference_img/`)와 자체 SVG 대체 이미지, `accessories/`의 사용자 제공 픽셀 액세서리 PNG 12종(망토 앞 여밈 포함 13장, 판매 6개, 한정품 3개, 퀘스트 상품 3개). 외부 캐릭터 무단 추가 금지.
 - `tests/`: 문제와 게임 로직 자동 테스트.
 
 ## 랜덤 문제 생성 규칙
