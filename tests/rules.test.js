@@ -1,6 +1,6 @@
 import {it,expect} from 'vitest';
 import {answerQuiz,growth,clamp} from '../src/game/rules.js';
-import {defaultPet,loadPet,savePet,resetPet,SAVE_KEY} from '../src/game/storage.js';
+import {defaultPet,loadPet,savePet,resetPet,resetConfirmed,SAVE_KEY} from '../src/game/storage.js';
 const state=()=>({pet:defaultPet(),quiz:{question:{correctAnswer:'4',options:['4','5','6','7']},action:'hunger',answered:false}});
 it('locks both correct and incorrect answers, including repeated queued updates',()=>{const initial=state();const once=answerQuiz(initial,'4');expect(once.pet.hunger).toBe(85);expect(once.pet.totalXp).toBe(10);expect(answerQuiz(once,'4')).toBe(once);const wrong=answerQuiz(initial,'5');expect(wrong.pet).toEqual(initial.pet);expect(answerQuiz(wrong,'4')).toBe(wrong);expect(answerQuiz(initial,'invalid')).toBe(initial);});
 it('caps states, rewards every action and handles level boundaries',()=>{for(const action of ['hunger','cleanliness','affection']){const s=state();s.quiz.action=action;s.pet[action]=99;expect(answerQuiz(s,'4').pet[action]).toBe(100);}expect(clamp(-5)).toBe(0);expect(clamp(150)).toBe(100);expect([0,49,50,149,150].map(x=>growth(x).level)).toEqual([1,1,2,2,3]);});
@@ -32,3 +32,4 @@ it('preserves reached stages through reload even when XP falls below their thres
   storage.setItem(SAVE_KEY,JSON.stringify(legacy));
   expect(loadPet(storage).pet.level).toBe(3);
 });
+it('resets only when the exact pet name is typed',()=>{expect(resetConfirmed('우사기',' 우사기 ')).toBe(true);expect(resetConfirmed(' 우사기 ','우사기')).toBe(true);expect(resetConfirmed('우사','우사기')).toBe(false);expect(resetConfirmed('','')).toBe(false);expect(resetConfirmed(null,'우사기')).toBe(false);});

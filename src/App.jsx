@@ -27,7 +27,7 @@ import { healthStatus } from './game/health.js';
 import { currentDaily, nextQuizReset, nextResetLabel, formatWait, daysTogether } from './game/time.js';
 import { DAILY_LIMIT, submitStored, updateStored, basicCare, setVacation } from './game/daily.js';
 import { readPending, writePending, clearPending, readRecent, addRecent, clearRecent } from './game/pendingQuiz.js';
-import { SAVE_KEY, loadPet, savePet, resetPet, defaultPet, createPet, DEFAULT_PET_NAME, readSave, importSave, validateSave } from './game/storage.js';
+import { SAVE_KEY, loadPet, savePet, resetPet, resetConfirmed, defaultPet, createPet, DEFAULT_PET_NAME, readSave, importSave, validateSave } from './game/storage.js';
 
 // How often a visible, signed-in window checks the account for another device's progress.
 const SYNC_POLL_MS = 30_000;
@@ -485,7 +485,11 @@ export default function App() {
 
   async function reset() {
     const user = userRef.current;
-    if (submitting.current || !window.confirm(user ? '펫과 모든 학습 기록을 초기화할까요?\n계정에 저장된 기록도 함께 지워져요.' : '펫과 모든 학습 기록을 초기화할까요?')) return;
+    if (submitting.current) return;
+    // Typing the pet name keeps a quick tap from wiping a pet that cannot be recovered.
+    const typed = window.prompt(`정말 처음부터 다시 키울까요? 되돌릴 수 없어요.\n${user ? '계정에 저장된 기록도 함께 지워져요.\n' : ''}초기화하려면 펫 이름 "${state.pet.petName}"을(를) 똑같이 입력하세요.`);
+    if (typed === null) return;
+    if (!resetConfirmed(typed, state.pet.petName)) { setNotice('펫 이름이 달라서 초기화하지 않았어요.'); return; }
     submitting.current = true;
     setPending(true);
     try {
@@ -515,7 +519,6 @@ export default function App() {
       <div className="header-actions">
         <AccountButton account={account} busy={accountBusy || pending} hasPet={started} petName={state.pet.petName} syncText={syncText} onLogin={login} onSignup={signup} onLogout={logout} />
         <button className="guide-open icon-button" onClick={() => setShowGuide(true)} aria-label="사용방법" title="사용방법">?</button>
-        <button className="reset icon-button" disabled={pending || accountBusy} onClick={reset} aria-label="초기화" title="초기화">↻</button>
       </div>
     </header>
     <div className="layout">
@@ -610,7 +613,7 @@ export default function App() {
       {notice && <p role="status" className="notice">{notice}</p>}
     </main>
     </div>
-    <footer>{account.user ? <>{account.user.username} 계정과 이 브라우저에 자동 저장돼요<br /></> : <>이 브라우저에 자동 저장돼요{account.status === 'off' ? '' : ' · 로그인하면 다른 기기에서도 이어서 키워요'}<br /></>}<span className="credit">by.meibinlee</span></footer>
+    <footer>{account.user ? <>{account.user.username} 계정과 이 브라우저에 자동 저장돼요<br /></> : <>이 브라우저에 자동 저장돼요{account.status === 'off' ? '' : ' · 로그인하면 다른 기기에서도 이어서 키워요'}<br /></>}<span className="credit">by.meibinlee</span>{started && <><br /><button className="reset" disabled={pending || accountBusy} onClick={reset}>펫 초기화</button></>}</footer>
     {state.quiz && <QuizModal quiz={state.quiz} pending={pending} limitReached={daily.count >= DAILY_LIMIT && (state.quiz.answered || !state.quiz.question.challenge) && !challengeDue} resetLabel={nextResetLabel(now)} sleepBlocked={resting(state.quiz.action,now)} restMessage={feedRest} vacationBlocked={onVacation} family={family}
       onAnswer={answer} onNext={() => openQuiz(state.quiz.action)} onClose={closeQuiz} />}
     {showGuide && <GuideDialog onClose={() => setShowGuide(false)} onTutorial={openTutorial} />}

@@ -228,6 +228,9 @@ export function resetPet(storage) {
   } catch { return false; }
 }
 
+// Reset needs the exact pet name typed, so it never happens by accident.
+export const resetConfirmed = (typed, petName) => typeof typed === 'string' && typed.trim() !== '' && typed.trim() === String(petName ?? '').trim();
+
 export function createPet(petName, characterId, now = Date.now()) {
   if (!isCharacterId(characterId)) throw new Error('친구를 선택해 주세요.');
   return { ...defaultPet(now), petName: petName.trim().slice(0,20) || DEFAULT_PET_NAME, characterId, album: newAlbum(characterId,now) };
