@@ -1,0 +1,110 @@
+/* Pixel theme (2026-11-13): match the 256px pixel art — dark-brown stepped borders, flat pastel fills, Galmuri pixel font.
+   Loaded after App.css and overrides it. Galmuri font: SIL OFL 1.1, see assets/fonts/Galmuri-OFL.md. */
+@font-face{font-family:Galmuri11;font-style:normal;font-weight:400;font-display:swap;src:url('./assets/fonts/Galmuri11.woff2') format('woff2')}
+@font-face{font-family:Galmuri11;font-style:normal;font-weight:700;font-display:swap;src:url('./assets/fonts/Galmuri11-Bold.woff2') format('woff2')}
+:root{
+  --px:3px;--ink:#3d2520;--ink-soft:#7a5a50;--muted:#8a7068;--line:#3d2520;
+  --card:#fffaf2;--soft:#fdf1e4;--pink:#fde0e6;--pink-deep:#f4a6b8;--butter:#fdf0c4;--mint:#ddf3e3;--sky:#dcf0fb;--lilac:#ebe3fb;--lilac-ink:#6a55a8;--coral:#ff7a59;--green:#7bb36a;
+  --shade:inset 0 calc(-1*var(--px)) 0 0 #0000001c;
+  /* Stepped (notched) border: four offset shadows leave the corners empty. */
+  --notch:0 calc(-1*var(--px)) 0 0 var(--ink),0 var(--px) 0 0 var(--ink),calc(-1*var(--px)) 0 0 0 var(--ink),var(--px) 0 0 0 var(--ink);
+  --picked:var(--notch),inset 0 0 0 4px var(--green);
+  font-family:Galmuri11,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;color:var(--ink)
+}
+body{background-color:#f6ead8;background-image:linear-gradient(45deg,#f1e2cc 25%,transparent 25% 75%,#f1e2cc 75%),linear-gradient(45deg,#f1e2cc 25%,transparent 25% 75%,#f1e2cc 75%);background-size:24px 24px;background-position:0 0,12px 12px;color:var(--ink)}
+code,pre{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+
+/* Buttons: square pixel blocks with a darker bottom step. */
+button{border:0;border-radius:0;background:var(--card);color:var(--ink);box-shadow:var(--notch),var(--shade);transition:transform .08s}
+button:hover:not(:disabled){filter:brightness(1.03);transform:translateY(-2px)}
+button:active:not(:disabled){transform:translateY(1px);box-shadow:var(--notch)}
+button:focus-visible,a:focus-visible,input:focus-visible,summary:focus-visible,.character-option:focus-within{outline:3px dashed var(--coral)!important;outline-offset:6px!important;border-radius:0!important}
+.primary{background:var(--green);color:#fff;box-shadow:var(--notch),inset 0 calc(-1*var(--px)) 0 0 #4f8a42}
+input{border:0!important;border-radius:0!important;background:#fff!important;box-shadow:var(--notch)}
+
+/* Header */
+.brand{font-weight:700;color:var(--ink)}.brand-icon{border-radius:0}
+.icon-button{border-radius:0;color:var(--ink);background:var(--butter);font-weight:700}
+.account-open{border-radius:0;font-weight:700}
+.account-open.guest{background:var(--coral);color:#fff;box-shadow:var(--notch),inset 0 calc(-1*var(--px)) 0 0 #d4523a}
+.account-open.signed-in{background:var(--mint);color:#2f6a3d;box-shadow:var(--notch),var(--shade)}
+
+/* Pills and badges */
+.pill{border:0;border-radius:0;background:var(--card);box-shadow:var(--notch);font-weight:700;color:var(--ink)}
+.top-pills{gap:12px;padding:0 var(--px)}
+.stage-pill,.tag{border-radius:0;background:var(--lilac);color:var(--lilac-ink);box-shadow:var(--notch)}
+.growth-track{border:0;border-radius:0;background:var(--card);box-shadow:var(--notch)}
+.growth-track span{border-radius:0;background:#e8dccf;box-shadow:inset 0 0 0 2px var(--ink-soft)}.growth-track span.on{background:var(--pink-deep);box-shadow:inset 0 0 0 2px var(--ink)}
+.growth-track small{color:var(--ink-soft)}
+.calendar-icon{border:0;border-radius:0;box-shadow:var(--notch)}.calendar-icon span{background:var(--pink-deep);color:var(--ink)}.calendar-icon strong{color:var(--ink)}
+.met-days{color:var(--ink-soft)}.met-days strong{color:#b0503a}
+
+/* Cards and panels */
+.card{border:0;border-radius:0;background:var(--card);box-shadow:var(--notch),9px 9px 0 0 #3d25201f}
+.pet-scene{border-radius:0;background:linear-gradient(#fde7e3 0 66%,#3d2520 66% calc(66% + 3px),#f3d6bd calc(66% + 3px));box-shadow:var(--notch)}
+.ground{border-radius:0;background:#e6c4a3;height:14px;bottom:18px}
+.bubble{border:0;border-radius:0;background:#fff;color:var(--ink);box-shadow:var(--notch)}
+.pet-status li{border-radius:0;background:var(--soft);color:var(--ink-soft);box-shadow:var(--notch)}
+.pet-status{gap:10px;padding:var(--px)}
+.status-bars{border:0;border-radius:0;background:var(--card);box-shadow:var(--notch);margin-top:12px}
+.status-icon{border-radius:0;box-shadow:var(--notch)}
+.status-body strong{color:var(--ink-soft)}
+progress{height:12px;border-radius:0;background:#efe2d3;box-shadow:0 0 0 2px var(--ink)}
+progress::-webkit-progress-bar{background:#efe2d3;border-radius:0}
+progress::-webkit-progress-value{border-radius:0;background:repeating-linear-gradient(90deg,#9fd08c 0 6px,#8bc277 6px 8px)}
+progress::-moz-progress-bar{background:repeating-linear-gradient(90deg,#9fd08c 0 6px,#8bc277 6px 8px)}
+.cleanliness progress::-webkit-progress-value{background:repeating-linear-gradient(90deg,#9fd3ee 0 6px,#86c3e3 6px 8px)}.cleanliness progress::-moz-progress-bar{background:repeating-linear-gradient(90deg,#9fd3ee 0 6px,#86c3e3 6px 8px)}
+.affection progress::-webkit-progress-value{background:repeating-linear-gradient(90deg,#f4a6b8 0 6px,#e98ea3 6px 8px)}.affection progress::-moz-progress-bar{background:repeating-linear-gradient(90deg,#f4a6b8 0 6px,#e98ea3 6px 8px)}
+.status.low progress::-webkit-progress-value{background:repeating-linear-gradient(90deg,#f0a27c 0 6px,#e38b63 6px 8px)}.status.low progress::-moz-progress-bar{background:repeating-linear-gradient(90deg,#f0a27c 0 6px,#e38b63 6px 8px)}
+.status-warn{color:#a2402c}
+
+/* Action tiles */
+.actions{gap:12px;margin-top:18px;padding:0 var(--px)}
+.actions button{border-radius:0;box-shadow:var(--notch),var(--shade)}
+.actions button:disabled{box-shadow:var(--notch)}
+.today-list{border-top:2px dashed var(--ink-soft)}.today-list li{border-bottom:2px dashed #d9c3b0}.today-list li span:last-child{color:var(--ink-soft)}
+details.more,details.growth-details{border:0;border-radius:0;background:var(--card);box-shadow:var(--notch);margin:16px var(--px) 0}
+details.more>summary::after{content:'+';font-weight:700;color:var(--ink)}details.more[open]>summary::after{content:'-'}
+.notice,.account-panel,.vacation-panel,.health-details,.sleep-details,.daily-summary,.streak-summary,.quest-summary,.graduation-panel,.graduates,.feedback,.quiz-done,.guide-topic{border:0;border-radius:0;box-shadow:var(--notch)}
+.notice{background:var(--lilac);color:var(--lilac-ink)}
+.vacation-panel{background:var(--soft)}.vacation-panel.on-vacation{background:var(--butter)}
+.health-details{background:var(--mint)}.health-details.is-sick{background:#ffe6d6}
+.sleep-details,.quiz-done{background:var(--lilac)}
+.streak-summary{background:var(--butter)}.streak-summary strong{color:#a0502e}
+.quest-summary{background:var(--lilac)}
+.graduation-panel,.graduates{background:#f3eefb}
+.feedback{background:var(--soft)}
+
+/* Dialogs */
+dialog{border:0;border-radius:0;background:var(--card);box-shadow:0 0 0 var(--px) var(--ink),10px 10px 0 var(--px) #3d252055}
+dialog::backdrop{background:#3d252066;backdrop-filter:none}
+pre{border-radius:0;background:#3a2c35;color:#f6efe2;box-shadow:var(--notch)}
+.options{gap:12px;padding:var(--px)}
+.option{border:0;border-radius:0;background:#fff}
+.option.correct{border:0;background:#dff1d6;box-shadow:var(--picked)}
+.option>span{color:var(--ink-soft);font-weight:700}
+.modal-actions{gap:12px;padding:var(--px)}
+.tutorial-dots span{border-radius:0;background:#e3d3c3}.tutorial-dots span.on{background:var(--ink)}
+.guide-content{gap:12px;padding:var(--px)}.guide-topic{background:var(--card)}.guide-topic summary:focus-visible{border-radius:0}.guide-topic li{color:var(--ink)}
+.account-dialog .account-panel{box-shadow:none}
+.account-panel.signed-in{background:var(--mint)}
+.account-password button{box-shadow:none;background:transparent}
+.account-error{color:#a2402c!important}
+
+/* Shop, selectors, album, family */
+.shop ul,.character-options,.growth-album ol,.graduates ul,.family-grid{gap:14px;padding:var(--px)}
+.shop li,.character-option,.growth-album li,.graduates li,.family-member{border:0!important;border-radius:0;box-shadow:var(--notch)}
+.shop li{background:var(--card)}.shop li.owned{background:var(--soft)}.shop li.limited{background:var(--butter)}.shop li.quest{background:var(--lilac)}
+.shop li.worn,.shop li.limited.worn{background:var(--mint);box-shadow:var(--picked)}
+.shop span{color:var(--ink-soft)}.shop h4{color:var(--ink)}
+.character-option{background:var(--card)}.character-option.selected{background:var(--mint);box-shadow:var(--picked)}
+.character-option img,.growth-album img,.graduates img,.welcome img,.shop li img{image-rendering:pixelated}
+.growth-album li{background:var(--card)}.growth-album .unrecorded{background:var(--soft)}
+.family-member{background:var(--card)}.family-member .status-bars{border-radius:0}.family-member .pet-scene{border-radius:0}
+.member-picker{gap:12px;padding:0 var(--px)}.member-picker button[aria-pressed="true"]{background:var(--mint);box-shadow:var(--picked)}
+.pet-bandage{border-radius:0;border:0;box-shadow:var(--notch)}
+footer{color:var(--ink-soft)}footer .reset{box-shadow:none;background:transparent;color:var(--ink-soft)}
+
+@media(prefers-reduced-motion:reduce){button:hover:not(:disabled),button:active:not(:disabled){transform:none}}
+@media(max-width:400px){.actions{gap:9px}.actions strong{font-size:13px}.pill{padding:6px 10px}.top-pills{gap:10px}}
+.pet-button,.pet-button:active:not(:disabled){box-shadow:none;background:transparent}
