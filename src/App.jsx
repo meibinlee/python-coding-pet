@@ -14,7 +14,7 @@ import { questStatus, dueChallenge, challengeQuestion, challengeDay, exchangeQue
 import { FamilyMember, GraduationPanel, RestingGraduates, HealthDetails } from './components/Family.jsx';
 import { isFamily, familyPets, familyCanCare, graduate, updateMember } from './game/family.js';
 import { streakStatus } from './game/streak.js';
-import { resolveLogin, cloudChangedElsewhere, syncAction, keepDailyProgress, readOwner, writeOwner, clearOwner, saveTime, markActed } from './game/account.js';
+import { resolveLogin, cloudChangedElsewhere, syncAction, keepDailyProgress, readOwner, writeOwner, clearOwner, saveTime, markActed, stableStringify, saveRev } from './game/account.js';
 import { cloudConfigured, cloudMessage, currentUser, signUp, signIn, signOut, fetchCloudSave, pushCloudSave, deleteCloudSave } from './game/cloud.js';
 import { characterImage, characterFor } from './data/characters.js';
 import { selectCharacter } from './game/album.js';
@@ -30,7 +30,10 @@ import { readPending, writePending, clearPending, readRecent, addRecent, clearRe
 import { SAVE_KEY, loadPet, savePet, resetPet, resetConfirmed, defaultPet, createPet, DEFAULT_PET_NAME, readSave, importSave, validateSave } from './game/storage.js';
 
 // How often a visible, signed-in window checks the account for another device's progress.
-const SYNC_POLL_MS = 30_000;
+const SYNC_POLL_MS = 15_000;
+// Before an action, wait this long for the account's latest save; offline play continues after it.
+const PULL_TIMEOUT_MS = 3000;
+const PULLED_RETRY = '다른 기기에서 진행한 기록을 불러왔어요. 확인하고 한 번 더 눌러 주세요.';
 
 const TILE_LABELS = { hunger: '먹이', cleanliness: '청소', affection: '놀이' };
 const SAVE_WARNING = '자동 저장에 실패했어요. 이 창을 닫으면 기록이 사라질 수 있어요.';
@@ -58,6 +61,7 @@ export default function App() {
   const history = useRef(readRecent());
   const trigger = useRef(null);
   const submitting = useRef(false);
+  const opening = useRef(false);
   const memoryOnly = useRef(false);
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -97,7 +101,7 @@ export default function App() {
   const full = members.every(member => isFull(member, now));
   const fullWait = Math.min(...members.map(member => fullRemaining(member, now)));
   const feedRest = full ? `${family ? '모두 ' : '이제 '}배불러요! ${formatWait(fullWait)} 후 다시 밥을 먹일 수 있어요.` : `${family ? '모두 쉬는' : '낮잠'} 중에는 밥을 쉬어요. 청소나 놀이를 선택해 주세요.`;
-  const resting = (action, time) => familyPets(state.pet).every(member => isActionResting(member, action, time));
+  const resting = (action, time, pet = state.pet) => familyPets(pet).every(member => isActionResting(member, action, time));
   const familyAt = useRef(state.pet.familyAt);
   useEffect(() => {
     if (state.pet.familyAt && !familyAt.current) setNotice('세 친구가 모두 자랐어요! 이제 다 함께 지내요. 정답 한 번에 모두를 돌볼 수 있어요.');
@@ -182,7 +186,7 @@ export default function App() {
       // Skip while an update is running; the next state change retries.
       if (submitting.current) return;
       const save = localPayload();
-      const text = save && JSON.stringify(save);
+      const text = save && stableStringify(save);
       const localChanged = Boolean(save) && text !== lastPushed.current;
       // With a quiz open, only upload this browser's progress; downloads wait until it closes.
       if (stateRef.current.quiz && !localChanged) return;
@@ -193,8 +197,9 @@ export default function App() {
       try {
         const cloud = await fetchCloudSave(user.id);
         if (userRef.current?.id !== user.id || submitting.current) return;
-        if (cloud && JSON.stringify(cloud) === text) { markSynced(user, cloud); return; }
-        const action = syncAction({ localSave: save, cloudSave: cloud && validateSave(cloud) ? cloud : null, syncedAt: readOwner()?.syncedAt, localChanged, acted: readOwner()?.acted });
+        if (cloud && stableStringify(cloud) === text) { markSynced(user, cloud); return; }
+        const owner = readOwner();
+        const action = syncAction({ localSave: save, cloudSave: cloud && validateSave(cloud) ? cloud : null, syncedAt: owner?.syncedAt, localChanged, acted: owner?.acted, rev: owner?.rev });
         if (action === 'download') {
           if (stateRef.current.quiz) { pulledTick.current = -1; return; }
           // Never bring back questions this browser already answered today.
@@ -210,17 +215,27 @@ export default function App() {
       } catch (error) {
         setSyncText(`${cloudMessage(error)} 이 브라우저에는 계속 저장되고, 연결되면 다시 저장해요.`);
       }
-    }, 1500);
+    }, delay);
     return () => clearTimeout(timer);
   }, [state.pet, account.user, started, syncTick]);
 
   useEffect(() => {
     const bump = () => { if (document.visibilityState !== 'hidden') setSyncTick(tick => tick + 1); };
+    // Leaving the app (switching apps, locking the phone, closing the tab): save to the account at once,
+    // so the other device sees this progress instead of waiting for this one to come back.
+    const leave = () => { if (document.visibilityState === 'hidden') { urgentSync.current = true; setSyncTick(tick => tick + 1); } };
     const events = [[window, 'focus'], [document, 'visibilitychange'], [window, 'pageshow'], [window, 'online']];
     events.forEach(([target, name]) => target.addEventListener(name, bump));
+    document.addEventListener('visibilitychange', leave);
+    window.addEventListener('pagehide', leave);
     // A window left open never regains focus, so also check the account on a timer while it is visible.
     const timer = setInterval(bump, SYNC_POLL_MS);
-    return () => { events.forEach(([target, name]) => target.removeEventListener(name, bump)); clearInterval(timer); };
+    return () => {
+      events.forEach(([target, name]) => target.removeEventListener(name, bump));
+      document.removeEventListener('visibilitychange', leave);
+      window.removeEventListener('pagehide', leave);
+      clearInterval(timer);
+    };
   }, []);
 
   function localPayload() {
@@ -228,10 +243,28 @@ export default function App() {
     return (!memoryOnly.current && readSave()) || { ...stateRef.current.pet, lastUpdatedAt: new Date().toISOString() };
   }
   function markSynced(user, save) {
-    lastPushed.current = JSON.stringify(save);
+    lastPushed.current = stableStringify(save);
     // An action saved after this snapshot still counts as unsynced progress.
-    const unsynced = readOwner()?.acted && JSON.stringify(readSave()) !== lastPushed.current;
-    writeOwner(user.id, saveTime(save), undefined, Boolean(unsynced));
+    const unsynced = readOwner()?.acted && stableStringify(readSave()) !== lastPushed.current;
+    writeOwner(user.id, saveTime(save), undefined, Boolean(unsynced), saveRev(save));
+  }
+  // Right before an action, bring in progress made on another device so this one never
+  // acts on (and then overwrites) an older save. Returns the downloaded pet, or null.
+  async function pullLatest() {
+    const user = userRef.current;
+    if (!user || !startedRef.current || memoryOnly.current) return null;
+    try {
+      const cloud = await Promise.race([fetchCloudSave(user.id), new Promise(resolve => setTimeout(() => resolve(undefined), PULL_TIMEOUT_MS))]);
+      if (!cloud || !validateSave(cloud) || userRef.current?.id !== user.id) return null;
+      const owner = readOwner(), save = localPayload();
+      if (!save || stableStringify(cloud) === stableStringify(save)) return null;
+      const localChanged = stableStringify(save) !== lastPushed.current;
+      if (syncAction({ localSave: save, cloudSave: cloud, syncedAt: owner?.syncedAt, localChanged, acted: owner?.acted, rev: owner?.rev }) !== 'download') return null;
+      const merged = keepDailyProgress(cloud, save);
+      const pet = download(user, merged);
+      if (merged !== cloud) { urgentSync.current = true; lastPushed.current = ''; }
+      return pet;
+    } catch { return null; }
   }
   async function upload(user, save) {
     await pushCloudSave(user.id, save);
@@ -246,6 +279,7 @@ export default function App() {
     setStarted(!result.isNew);
     setName(result.pet.petName);
     setCharacter(result.pet.characterId ?? 'chiikawa');
+    return result.pet;
   }
 
   // Combines this browser's pet and the account's pet. Returns false when the player cancels.
@@ -254,7 +288,7 @@ export default function App() {
     const cloudSave = cloud && validateSave(cloud) ? cloud : null;
     const local = localPayload();
     const owner = readOwner();
-    let decision = resolveLogin({ localSave: local, localOwner: owner?.id, cloudSave, userId: user.id, syncedAt: owner?.syncedAt, acted: owner?.acted });
+    let decision = resolveLogin({ localSave: local, localOwner: owner?.id, cloudSave, userId: user.id, syncedAt: owner?.syncedAt, acted: owner?.acted, rev: owner?.id === user.id ? owner?.rev : undefined });
     if (decision === 'ask') {
       if (window.confirm(`이 브라우저와 계정에 서로 다른 펫 기록이 있어요.\n· 이 브라우저: ${local.petName} (XP ${local.totalXp})\n· 계정: ${cloudSave.petName} (XP ${cloudSave.totalXp})\n\n[확인] 계정의 ${cloudSave.petName}을(를) 불러와요.\n[취소] 다른 선택지를 볼게요.`)) decision = 'download';
       else if (window.confirm(`이 브라우저의 ${local.petName}을(를) 계정에 저장할까요?\n계정에 있던 ${cloudSave.petName}의 기록은 사라져요.\n[취소] 로그인을 취소하고 두 기록을 그대로 둬요.`)) decision = 'upload';
@@ -323,7 +357,7 @@ export default function App() {
     setAccountBusy(true);
     try {
       const save = localPayload();
-      if (save && JSON.stringify(save) !== lastPushed.current && !cloudChangedElsewhere(await fetchCloudSave(user.id), readOwner()?.syncedAt)) await upload(user, save);
+      if (save && stableStringify(save) !== lastPushed.current && !cloudChangedElsewhere(await fetchCloudSave(user.id), readOwner()?.syncedAt, readOwner()?.rev)) await upload(user, save);
       await signOut();
       resetPet();
       clearOwner();
@@ -372,11 +406,13 @@ export default function App() {
       `${state.pet.petName}이(가) 졸업했어요! 이제 새 친구 ${next.name}의 알과 함께해요.`, '아직 졸업할 수 없거나 이미 졸업했어요. 현재 상태를 확인해 주세요.');
   }
 
-  async function performUpdate(update, successMessage = '', blockedMessage = '이미 처리한 행동이거나 지금 풀 수 있는 문제를 모두 풀었어요.') {
+  async function performUpdate(update, successMessage = '', blockedMessage = '이미 처리한 행동이거나 지금 풀 수 있는 문제를 모두 풀었어요.', pulledMessage = PULLED_RETRY) {
     if (submitting.current) return null;
     submitting.current = true;
     setPending(true);
     try {
+      // Another device moved on: show its progress first instead of acting on an old save.
+      if (await pullLatest()) { setNotice(pulledMessage); return null; }
       const result = await update({ preferMemory: memoryOnly.current });
       setState(result.state);
       if (!result.blocked && result.state.quiz?.correct) pendingReaction.current = result.state.quiz.action;
@@ -407,7 +443,7 @@ export default function App() {
     const allFull = pet => familyPets(pet).every(member => isFull(member, Date.now()));
     const wasFull = allFull(state.pet), rewards = state.pet.streak.rewards;
     urgentSync.current = true;
-    const result = await performUpdate(options => submitStored(state, choice, options));
+    const result = await performUpdate(options => submitStored(state, choice, options), undefined, undefined, '다른 기기에서 진행한 기록을 불러왔어요. 같은 문제를 다시 열어 답해 주세요.');
     const quiz = result?.state.quiz;
     if (quiz?.answered) { history.current = addRecent(quiz.question, undefined, history.current); clearPending(); }
     // The second meal fills the pet: show the result briefly, then close the quiz.
@@ -437,28 +473,34 @@ export default function App() {
     if (!tutorialSeen()) setShowTutorial(true);
   }
 
-  function openQuiz(action) {
+  async function openQuiz(action) {
+    if (opening.current || submitting.current) return;
+    opening.current = true;
+    let pulled = null;
+    try { pulled = await pullLatest(); } finally { opening.current = false; }
+    if (pulled) setNotice('다른 기기에서 진행한 더 최근 기록을 불러왔어요.');
+    const pet = pulled ?? stateRef.current.pet;
     const time = Date.now();
     setNow(time);
-    if (isOnVacation(state.pet)) {
+    if (isOnVacation(pet)) {
       setNotice('휴가를 마친 뒤 문제와 돌봄을 이어갈 수 있어요.');
       return;
     }
-    if (resting(action, time)) {
+    if (resting(action, time, pet)) {
       setNotice(feedRest);
       return;
     }
-    if (currentDaily(state.pet, time).count >= DAILY_LIMIT && dueChallenge(state.pet, time) === null) {
+    if (currentDaily(pet, time).count >= DAILY_LIMIT && dueChallenge(pet, time) === null) {
       setNotice(`오늘의 복습이 끝났어요! ${nextResetLabel(time)}에 다시 만나요.`);
       return;
     }
     // The 1st, 4th and 7th question of the day is the day's challenge (daily quest).
-    const slot = dueChallenge(state.pet, time), date = questStatus(state.pet, time).date;
+    const slot = dueChallenge(pet, time), date = questStatus(pet, time).date;
     // Reopen today's unanswered question (after a refresh or close) instead of handing out a new one.
     const recent = readRecent();
     if (recent.length) history.current = recent;
     const pending = readPending(date);
-    const reuse = pending && !currentDaily(state.pet, time).submittedIds.includes(pending.instanceId) &&
+    const reuse = pending && !currentDaily(pet, time).submittedIds.includes(pending.instanceId) &&
       !history.current.some(item => item.instanceId === pending.instanceId) &&
       (slot === null ? !pending.challenge : pending.challenge?.index === slot) ? pending : null;
     const question = reuse ?? (slot === null ? nextQuestion(history.current.filter(item => !item.challenge)) : challengeQuestion(date, slot));

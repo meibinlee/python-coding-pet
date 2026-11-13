@@ -1,5 +1,5 @@
 import { it, expect } from 'vitest';
-import { credentialError, usernameToEmail, usernameFromEmail, resolveLogin, cloudChangedElsewhere, syncAction, authErrorMessage, readOwner, writeOwner, clearOwner, markActed } from '../src/game/account.js';
+import { credentialError, usernameToEmail, usernameFromEmail, resolveLogin, cloudChangedElsewhere, syncAction, authErrorMessage, readOwner, writeOwner, clearOwner, markActed, stableStringify, saveRev } from '../src/game/account.js';
 import { createPet, readSave, importSave, savePet, SAVE_KEY } from '../src/game/storage.js';
 const t=Date.parse('2026-10-26T03:00:00Z');
 const save=(name,time,xp=10)=>({...createPet(name,'chiikawa',t),totalXp:xp,lastUpdatedAt:new Date(time).toISOString()});
@@ -81,4 +81,24 @@ it('records a player action until the next sync',()=>{
   writeOwner('u1',t,storage);expect(readOwner(storage).acted).toBe(false);
   markActed(storage);expect(readOwner(storage)).toEqual({id:'u1',syncedAt:t,acted:true});
   writeOwner('u1',t+5,storage);expect(readOwner(storage).acted).toBe(false);
+});
+it('fingerprints a save independent of key order',()=>{
+  const a=save('p',t);const reordered=Object.fromEntries(Object.entries(a).reverse());
+  expect(stableStringify(reordered)).toBe(stableStringify(a));
+  expect(saveRev(reordered)).toBe(saveRev(a));
+  expect(saveRev({...a,totalXp:11})).not.toBe(saveRev(a));
+  expect(saveRev(null)).toBe('');
+});
+it('notices another device even when its clock is behind',()=>{
+  // Phone synced its own save at t+120s; the tablet's clock is two minutes slow and writes "t".
+  const synced=save('p',t+120000,40), tablet=save('p',t,60);
+  expect(cloudChangedElsewhere(tablet,t+120000)).toBe(false); // old clock-based check misses it
+  expect(cloudChangedElsewhere(tablet,t+120000,saveRev(synced))).toBe(true);
+  expect(cloudChangedElsewhere(synced,t+120000,saveRev(synced))).toBe(false);
+  expect(syncAction({localSave:synced,cloudSave:tablet,syncedAt:t+120000,localChanged:false,rev:saveRev(synced)})).toBe('download');
+  expect(resolveLogin({localSave:synced,localOwner:'u1',cloudSave:tablet,userId:'u1',syncedAt:t+120000,rev:saveRev(synced)})).toBe('download');
+});
+it('keeps the synced fingerprint when an action is marked',()=>{
+  const storage=memory();writeOwner('u1',t,storage,false,'abc-1');markActed(storage);
+  expect(readOwner(storage)).toEqual({id:'u1',syncedAt:t,acted:true,rev:'abc-1'});
 });

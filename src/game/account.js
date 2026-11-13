@@ -36,21 +36,43 @@ const updatedAt = save => {
  * upload: keep this browser's pet in the account (also the guest → member path).
  * download: continue the account's pet here. ask: two different pets, let the player choose.
  */
-export function resolveLogin({ localSave, localOwner, cloudSave, userId, syncedAt, acted = false }) {
+export function resolveLogin({ localSave, localOwner, cloudSave, userId, syncedAt, acted = false, rev }) {
   if (!cloudSave) return localSave ? 'upload' : 'none';
   if (!localSave) return 'download';
   if (localOwner === userId) {
     // Time-based updates alone must not overwrite progress made on another device.
-    if (cloudChangedElsewhere(cloudSave, syncedAt) && !acted) return 'download';
+    if (cloudChangedElsewhere(cloudSave, syncedAt, rev) && !acted) return 'download';
     return updatedAt(localSave) > updatedAt(cloudSave) ? 'upload' : 'download';
   }
   const { lastUpdatedAt: _a, ...local } = localSave, { lastUpdatedAt: _b, ...cloud } = cloudSave;
   return JSON.stringify(local) === JSON.stringify(cloud) ? 'download' : 'ask';
 }
 
+// Key-sorted JSON, so the same save gives the same text even after the database reorders its keys.
+export function stableStringify(value) {
+  if (Array.isArray(value)) return `[${value.map(item => stableStringify(item === undefined ? null : item)).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value).filter(key => value[key] !== undefined).sort().map(key => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value) ?? 'null';
+}
+// Short fingerprint of a save's content (FNV-1a), used to notice another device's write
+// without trusting either device's clock.
+export function saveRev(save) {
+  if (!save) return '';
+  const text = stableStringify(save);
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) { hash ^= text.charCodeAt(i); hash = Math.imul(hash, 0x01000193); }
+  return `${(hash >>> 0).toString(16)}-${text.length.toString(16)}`;
+}
+
 // Another device wrote after our last sync, so pushing now would overwrite its progress.
-export function cloudChangedElsewhere(cloudSave, syncedAt) {
-  return Boolean(cloudSave) && updatedAt(cloudSave) > (syncedAt ?? 0);
+// With the fingerprint of the last synced save, any different account save counts as another
+// device's write; device clocks often differ (school tablet vs. phone), so the timestamp is only a fallback.
+export function cloudChangedElsewhere(cloudSave, syncedAt, rev) {
+  if (!cloudSave) return false;
+  if (rev) return saveRev(cloudSave) !== rev;
+  return updatedAt(cloudSave) > (syncedAt ?? 0);
 }
 
 /**
@@ -58,8 +80,8 @@ export function cloudChangedElsewhere(cloudSave, syncedAt) {
  * the player did nothing here since the last sync (time-based updates do not count);
  * when the player acted on both devices, the more recent save wins.
  */
-export function syncAction({ localSave, cloudSave, syncedAt, localChanged, acted = false }) {
-  if (!cloudChangedElsewhere(cloudSave, syncedAt)) return localChanged ? 'upload' : 'none';
+export function syncAction({ localSave, cloudSave, syncedAt, localChanged, acted = false, rev }) {
+  if (!cloudChangedElsewhere(cloudSave, syncedAt, rev)) return localChanged ? 'upload' : 'none';
   if (!localChanged || !acted) return 'download';
   return updatedAt(cloudSave) >= updatedAt(localSave) ? 'download' : 'upload';
 }
@@ -89,16 +111,16 @@ export function keepDailyProgress(cloudSave, localSave) {
 export function readOwner(storage) {
   try {
     const value = JSON.parse((storage ?? globalThis.localStorage).getItem(OWNER_KEY));
-    return value && typeof value.id === 'string' ? { id: value.id, syncedAt: Number.isFinite(value.syncedAt) ? value.syncedAt : 0, acted: value.acted === true } : null;
+    return value && typeof value.id === 'string' ? { id: value.id, syncedAt: Number.isFinite(value.syncedAt) ? value.syncedAt : 0, acted: value.acted === true, rev: typeof value.rev === 'string' && value.rev ? value.rev : undefined } : null;
   } catch { return null; }
 }
-export function writeOwner(id, syncedAt, storage, acted = false) {
-  try { (storage ?? globalThis.localStorage).setItem(OWNER_KEY, JSON.stringify({ id, syncedAt, acted })); } catch { /* sync still works for this tab */ }
+export function writeOwner(id, syncedAt, storage, acted = false, rev) {
+  try { (storage ?? globalThis.localStorage).setItem(OWNER_KEY, JSON.stringify({ id, syncedAt, acted, rev })); } catch { /* sync still works for this tab */ }
 }
 // Records a player action (quiz, care, shop…) not yet synced to the account.
 export function markActed(storage) {
   const owner = readOwner(storage);
-  if (owner && !owner.acted) writeOwner(owner.id, owner.syncedAt, storage, true);
+  if (owner && !owner.acted) writeOwner(owner.id, owner.syncedAt, storage, true, owner.rev);
 }
 export function clearOwner(storage) {
   try { (storage ?? globalThis.localStorage).removeItem(OWNER_KEY); } catch { /* nothing to clear */ }
