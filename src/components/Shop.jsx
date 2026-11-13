@@ -1,3 +1,4 @@
+import { PixelIcon, iconText } from './PixelIcon.jsx';
 import { SHOP_LEVEL, SLOTS, shopItems, limitedItems, questItems, canShop } from '../game/shop.js';
 import { STREAK_REWARDS } from '../game/streak.js';
 import { ART_VERSION } from '../data/characters.js';
@@ -17,7 +18,7 @@ export default function Shop({ pet, stars = 0, pending = false, onBuy, onEquip, 
         if (item.quest) return <li key={item.id} className={`limited quest${worn ? ' worn' : owned ? ' owned' : ''}`}>
           <img src={`${import.meta.env.BASE_URL}pets/accessories/${item.id}.png?v=${ART_VERSION}`} alt="" width="56" height="56" />
           <strong>{item.name}</strong>
-          <span>{worn ? '✓ 착용 중' : owned ? '퀘스트 보상' : `⭐ 별 조각 ${item.questPrice}개`}</span>
+          <span>{worn ? '✓ 착용 중' : owned ? '퀘스트 보상' : <><PixelIcon name="star" /> 별 조각 {item.questPrice}개</>}</span>
           {owned
             ? <button disabled={pending || !open} aria-pressed={worn} onClick={() => onEquip(slot, worn ? null : item.id)}>{!open ? '성체부터' : worn ? '벗기' : '착용하기'}</button>
             : <button disabled={pending || stars < item.questPrice} onClick={() => onExchange(item)}>{stars < item.questPrice ? `별 ${item.questPrice - stars}개 부족` : '교환하기'}</button>}
@@ -25,7 +26,7 @@ export default function Shop({ pet, stars = 0, pending = false, onBuy, onEquip, 
         if (item.limited) return <li key={item.id} className={`limited${worn ? ' worn' : owned ? ' owned' : ''}`}>
           <img src={`${import.meta.env.BASE_URL}pets/accessories/${item.id}.png?v=${ART_VERSION}`} alt="" width="56" height="56" />
           <strong>{item.name}</strong>
-          <span>{worn ? '✓ 착용 중' : owned ? '연속 학습 보상' : `🔥 연속 ${rewardDays(item.id)}일 보상`}</span>
+          <span>{worn ? '✓ 착용 중' : owned ? '연속 학습 보상' : <><PixelIcon name="fire" /> 연속 {rewardDays(item.id)}일 보상</>}</span>
           {owned
             ? <button disabled={pending || !open} aria-pressed={worn} onClick={() => onEquip(slot, worn ? null : item.id)}>{!open ? '성체부터' : worn ? '벗기' : '착용하기'}</button>
             : <button disabled>연속 {rewardDays(item.id)}일 달성 시</button>}

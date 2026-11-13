@@ -1,8 +1,9 @@
-import { characterImage, characterFor, petMood, accessoryPieces, ART_VERSION } from '../data/characters.js';
+import { PixelIcon, iconText } from './PixelIcon.jsx';
+import { characterImage, characterFor, petMood, accessoryPieces, figureScale, ART_VERSION } from '../data/characters.js';
 import { SHOP_LEVEL, itemFor } from '../game/shop.js';
 import { useEffect, useRef, useState } from 'react';
 
-const TRASH = ['🥤', '🍂', '📄', '🧻'];
+const TRASH = ['cup', 'leaf', 'paper', 'roll'];
 
 export default function Pet({ pet, stage, limitReached = false, sick = false, sickMessage = '', sleeping = false, full = false, messy = false, trash = 0, cleaning = false, playing = false, vacation = false, pose = null }) {
   // `pose` is display only: a 5-second care reaction or the rest loop after the questions run out.
@@ -48,7 +49,7 @@ export default function Pet({ pet, stage, limitReached = false, sick = false, si
     <span className="spark s2" aria-hidden="true">✦</span>
     <div className="bubble" role="status">{message}</div>
     <button className={`pet-button${petted ? ' petted' : ''}${sick ? ' sick-pet' : ''}${sleeping || dozing ? ' sleeping-pet' : ''}${vacation ? ' vacation-pet' : ''}`} onClick={petFriend} aria-label={`${pet.petName} 쓰다듬기`}>
-      <span className="pet-figure">
+      <span className="pet-figure" style={figureScale(pet.characterId, stage.level) !== 1 ? { scale: String(figureScale(pet.characterId, stage.level)) } : undefined}>
         <img className="pet" src={src} alt={`${characterFor(pet.characterId)?.name ?? '친구'} · ${stage.name} 모습의 ${pet.petName}${wornText}`} width="210" height="210" />
         {pieces.map(piece => <img key={piece.id} className={`accessory acc-${piece.layer}`} style={{ left: piece.left, top: piece.top, width: piece.width, height: piece.height }}
           src={`${import.meta.env.BASE_URL}pets/accessories/${piece.id}.png?v=${ART_VERSION}`} alt="" aria-hidden="true" />)}
@@ -58,10 +59,10 @@ export default function Pet({ pet, stage, limitReached = false, sick = false, si
       {petted && <span className="pet-heart" aria-hidden="true">♥</span>}
     </button>
     <div className="ground" />
-    {Array.from({ length: trash }, (_, i) => <span key={i} className={`room-trash t${i}`} aria-hidden="true">{TRASH[i]}</span>)}
+    {Array.from({ length: trash }, (_, i) => <span key={i} className={`room-trash t${i}`} aria-hidden="true"><PixelIcon name={TRASH[i]} size="1em" /></span>)}
     {trash > 0 && <span className="visually-hidden">주변에 쓰레기 {trash}개가 있어요</span>}
-    {messy && <span className="room-mess" role="img" aria-label="방에 치울 배설물이 있어요">💩</span>}
-    {cleaning && <span className="cleaning-sparkles" aria-hidden="true">✦ 🫧 ✧</span>}
+    {messy && <span className="room-mess" role="img" aria-label="방에 치울 배설물이 있어요"><PixelIcon name="poop" size="1em" /></span>}
+    {cleaning && <span className="cleaning-sparkles" aria-hidden="true">✦ <PixelIcon name="bubble" size="1em" /> ✧</span>}
     <span className="plant" aria-hidden="true">✿</span>
   </div>;
 }

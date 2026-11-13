@@ -1,3 +1,4 @@
+import { PixelIcon, iconText } from './PixelIcon.jsx';
 import { useState } from 'react';
 import Pet from './Pet.jsx';
 import StatusBars from './StatusBars.jsx';
@@ -50,7 +51,7 @@ export function GraduationPanel({ pet, now, pending = false, onGraduate }) {
   const [name, setName] = useState('');
   if (!status.available) return null;
   return <section className="graduation-panel" aria-labelledby="graduation-title">
-    <h3 id="graduation-title">🎓 졸업하고 다음 알 만나기</h3>
+    <h3 id="graduation-title"><PixelIcon name="cap" /> 졸업하고 다음 알 만나기</h3>
     <ul>
       <li>{status.remainingMs === 0 ? '✓' : '○'} 성체가 된 뒤 3일{status.remainingMs > 0 ? ` · ${formatWait(status.remainingMs)} 남음` : ''}</li>
       <li>{status.sick ? '○ 건강을 되찾아야 해요' : '✓ 건강해요'}</li>
@@ -73,7 +74,7 @@ export function RestingGraduates({ pet }) {
   if (isFamily(pet) || !pet.graduates.length) return null;
   const left = FAMILY_SIZE - 1 - pet.graduates.length;
   return <section className="graduates" aria-labelledby="graduates-title">
-    <h3 id="graduates-title">🎓 쉬고 있는 졸업생</h3>
+    <h3 id="graduates-title"><PixelIcon name="cap" /> 쉬고 있는 졸업생</h3>
     <p>{left === 0 ? `${pet.petName}이(가) 성체가 되면 세 친구가 함께 지내요.` : `친구 ${left + 1}마리가 더 자라면 모두 함께 지내요.`} 그동안 졸업생의 시간은 멈춰 있어요.</p>
     <ul>{pet.graduates.map(graduate => <li key={graduate.characterId}>
       <img src={characterImage(graduate.characterId, 3, 'normal', import.meta.env.BASE_URL)} alt={`${characterFor(graduate.characterId)?.name} 성체 모습의 ${graduate.petName}`} width="90" height="90" loading="lazy" />

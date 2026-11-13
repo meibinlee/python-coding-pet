@@ -108,3 +108,12 @@ footer{color:var(--ink-soft)}footer .reset{box-shadow:none;background:transparen
 @media(prefers-reduced-motion:reduce){button:hover:not(:disabled),button:active:not(:disabled){transform:none}}
 @media(max-width:400px){.actions{gap:9px}.actions strong{font-size:13px}.pill{padding:6px 10px}.top-pills{gap:10px}}
 .pet-button,.pet-button:active:not(:disabled){box-shadow:none;background:transparent}
+/* Feet stay on the ground when a figure is scaled (Usagi, see figureScale). */
+.pet-figure{transform-origin:50% 85%}
+/* Pixel icons (src/components/PixelIcon.jsx) sit on the text baseline like the emoji they replace. */
+.pixel-icon{display:inline-block;vertical-align:-0.2em;image-rendering:pixelated;flex-shrink:0}
+.actions button>span{line-height:0}
+.status-icon{display:grid;place-items:center}
+.room-trash .pixel-icon,.room-mess .pixel-icon{width:1em;height:1em}
+.bubble{z-index:3}
+summary .pixel-icon,.pill .pixel-icon,.today-list .pixel-icon{margin-right:.2em}

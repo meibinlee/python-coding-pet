@@ -109,6 +109,11 @@ export function accessoryPieces(characterId, mood, itemId) {
   return [itemId, ...(accessoryAssets[itemId].front ?? [])].map(name => place(name, landmark));
 }
 
+// Usagi is drawn with a smaller head than the others. Measured widest row of the body (ears excluded):
+// baby 100px vs 132–136px, adult 121px vs 152px. Scaled from the feet so all three heads match.
+const FIGURE_SCALE = { usagi: { 2: 1.33, 3: 1.25 } };
+export const figureScale = (id, level) => FIGURE_SCALE[id]?.[level] ?? 1;
+
 export const isCharacterId = id => characters.some(character => character.id === id);
 export const characterFor = id => characters.find(character => character.id === id) ?? null;
 // Bump when the art changes so browsers do not keep showing cached old images.

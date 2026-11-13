@@ -18,6 +18,7 @@ import { resolveLogin, cloudChangedElsewhere, syncAction, keepDailyProgress, rea
 import { cloudConfigured, cloudMessage, currentUser, signUp, signIn, signOut, fetchCloudSave, pushCloudSave, deleteCloudSave } from './game/cloud.js';
 import { characterImage, characterFor } from './data/characters.js';
 import { selectCharacter } from './game/album.js';
+import { PixelIcon, iconText } from './components/PixelIcon.jsx';
 import QuizModal from './components/QuizModal.jsx';
 import { nextQuestion } from './game/questions.js';
 import { actions, growth, growthStatus, refreshGrowth, isRoomMessy } from './game/rules.js';
@@ -557,7 +558,7 @@ export default function App() {
 
   return <div className="app">
     <header>
-      <a href="./" className="brand"><img className="brand-icon" src={`${import.meta.env.BASE_URL}favicon.svg?v=rabbit1`} width="38" height="38" alt="" /> 파이썬 타마고치</a>
+      <a href="./" className="brand"><img className="brand-icon" src={`${import.meta.env.BASE_URL}favicon.svg?v=pixel1`} width="38" height="38" alt="" /> 파이썬 타마고치</a>
       <div className="header-actions">
         <AccountButton account={account} busy={accountBusy || pending} hasPet={started} petName={state.pet.petName} syncText={syncText} onLogin={login} onSignup={signup} onLogout={logout} />
         <button className="guide-open icon-button" onClick={() => setShowGuide(true)} aria-label="사용방법" title="사용방법">?</button>
@@ -566,9 +567,9 @@ export default function App() {
     <div className="layout">
     <main>
       {started && state.pet.characterId && <div className="top-pills" aria-label="오늘 요약">
-        <span className="pill" aria-label={`별 조각 ${quest.stars}개`}>⭐ {quest.stars}</span>
-        <span className="pill" aria-label={daily.count >= DAILY_LIMIT ? `${nextResetLabel(now)}에 새 문제` : `남은 문제 ${DAILY_LIMIT - daily.count}개`}>{daily.count >= DAILY_LIMIT ? `🌙 ${nextResetLabel(now)}` : `✏️ ${DAILY_LIMIT - daily.count}/${DAILY_LIMIT}`}</span>
-        {[state.pet, ...state.pet.graduates].map(member => <span className="pill" key={member.characterId ?? 'pet'}>📅 {member.petName} 만난 지 {daysTogether(member.growth.startedAt, now)}일째</span>)}
+        <span className="pill" aria-label={`별 조각 ${quest.stars}개`}><PixelIcon name="star" /> {quest.stars}</span>
+        <span className="pill" aria-label={daily.count >= DAILY_LIMIT ? `${nextResetLabel(now)}에 새 문제` : `남은 문제 ${DAILY_LIMIT - daily.count}개`}>{daily.count >= DAILY_LIMIT ? <><PixelIcon name="moon" /> {nextResetLabel(now)}</> : <><PixelIcon name="pencil" /> {DAILY_LIMIT - daily.count}/{DAILY_LIMIT}</>}</span>
+        {[state.pet, ...state.pet.graduates].map(member => <span className="pill" key={member.characterId ?? 'pet'}><PixelIcon name="calendar" /> {member.petName} 만난 지 {daysTogether(member.growth.startedAt, now)}일째</span>)}
       </div>}
       {!started ? <form className="welcome card" onSubmit={start}>
         <img src={characterImage(character,1,'normal',import.meta.env.BASE_URL)} alt={`${characterFor(character).name} 알 모습`} className="welcome-egg" />
@@ -585,7 +586,7 @@ export default function App() {
       </section> : <section className={`card pet-card${family ? ' family-card' : ''}`} aria-label={family ? '우리 가족' : '나의 펫'}>
         {family ? <>
           <div className="profile"><div className="profile-name"><h2>{members.map(member => member.petName).join(' · ')}</h2><span className="stage-pill">가족</span></div></div>
-          {onVacation && <ul className="pet-status" role="status"><li>☀ 휴가 중 · 모든 시간이 멈췄어요</li></ul>}
+          {onVacation && <ul className="pet-status" role="status"><li><PixelIcon name="sun" /> 휴가 중 · 모든 시간이 멈췄어요</li></ul>}
           <div className="family-grid">{members.map(member => <FamilyMember key={member.characterId} pet={member} now={now} limitReached={daily.count >= DAILY_LIMIT} pose={pose} />)}</div>
         </> : <>
         <div className="profile">
@@ -597,11 +598,11 @@ export default function App() {
         </div>
         <Pet pet={state.pet} stage={stage} sick={health.sick} sickMessage={health.cause ? SICK_CAUSES[health.cause] : ''} sleeping={nap.sleeping} full={full} messy={isRoomMessy(state.pet)} trash={trash} cleaning={cleaning} playing={playing} vacation={onVacation} limitReached={daily.count >= DAILY_LIMIT} pose={pose} />
         <ul className="pet-status" role="status">
-          {onVacation && <li>☀ 휴가 중 · 모든 시간이 멈췄어요</li>}
+          {onVacation && <li><PixelIcon name="sun" /> 휴가 중 · 모든 시간이 멈췄어요</li>}
           {nap.sleeping && <li id="sleep-note">☾ 낮잠 중 · 약 {formatWait(nap.remainingMs)} 뒤에 깨요</li>}
-          {full && <li id="full-note">🍙 이제 배불러요! {formatWait(fullWait)} 후 다시 밥 먹이기</li>}
-          {trash > 0 && <li>🧹 주변에 쓰레기 {trash}개 · 청소하면 줄어요</li>}
-          {isRoomMessy(state.pet) && <li>💩 치울 것이 생겼어요</li>}
+          {full && <li id="full-note"><PixelIcon name="rice" /> 이제 배불러요! {formatWait(fullWait)} 후 다시 밥 먹이기</li>}
+          {trash > 0 && <li><PixelIcon name="broom" /> 주변에 쓰레기 {trash}개 · 청소하면 줄어요</li>}
+          {isRoomMessy(state.pet) && <li><PixelIcon name="poop" /> 치울 것이 생겼어요</li>}
         </ul>
         {health.sick && <HealthDetails pet={state.pet} health={health} />}
         <StatusBars pet={state.pet} canSicken={stage.level >= 2} />
@@ -612,15 +613,15 @@ export default function App() {
             return <button
               key={action} className={action} disabled={pending || onVacation || (daily.count >= DAILY_LIMIT && !challengeDue) || rest} aria-describedby={rest && !family ? (full ? 'full-note' : 'sleep-note') : undefined}
               onClick={event => { trigger.current = event.currentTarget; openQuiz(action); }}
-            ><span aria-hidden="true">{['🍙', '🧹', '🧸'][index]}</span><strong>{TILE_LABELS[action]}</strong>{(onVacation || rest) && <small>{onVacation ? '휴가 중' : full ? formatWait(fullWait) : '낮잠 중'}</small>}</button>;
+            ><span aria-hidden="true"><PixelIcon name={['rice', 'broom', 'bear'][index]} size="30px" /></span><strong>{TILE_LABELS[action]}</strong>{(onVacation || rest) && <small>{onVacation ? '휴가 중' : full ? formatWait(fullWait) : '낮잠 중'}</small>}</button>;
           })}
           <button className="care" onClick={() => performUpdate(options => updateStored(state, basicCare, options), anySick ? '간호 기록을 남겼어요. 회복 조건을 확인해 주세요.' : family ? '오늘도 모두 곁에서 돌봐 줬어요!' : '오늘도 곁에서 돌봐 줬어요!')} disabled={pending || !canCare}>
-            <span aria-hidden="true">{anySick ? '✚' : '♡'}</span><strong>{anySick ? '간호' : '돌봄'}</strong>{!canCare && <small>{onVacation ? '휴가 중' : '오늘 완료'}</small>}
+            <span aria-hidden="true"><PixelIcon name={anySick ? 'cross' : 'heart'} size="30px" /></span><strong>{anySick ? '간호' : '돌봄'}</strong>{!canCare && <small>{onVacation ? '휴가 중' : '오늘 완료'}</small>}
           </button>
         </div>
         <ul className="today-list">
-          <li><span>⭐ {challengeDay(quest.date).template.title}</span><span aria-label={`오늘의 도전 ${quest.results.filter(Boolean).length}개 성공`}>{QUEST_SLOTS.map((_, i) => quest.results[i] === undefined ? '○' : quest.results[i] ? '✓' : '✕').join(' ')}</span></li>
-          <li><span>🔥 연속 학습 {streak.count}일{streak.studiedToday ? ' ✓' : ''}</span><span>{streak.next ? `${streak.daysToNext}일 뒤 ${itemFor(streak.next.itemId).name}` : '한정품 완성'}</span></li>
+          <li><span><PixelIcon name="star" /> {challengeDay(quest.date).template.title}</span><span aria-label={`오늘의 도전 ${quest.results.filter(Boolean).length}개 성공`}>{QUEST_SLOTS.map((_, i) => quest.results[i] === undefined ? '○' : quest.results[i] ? '✓' : '✕').join(' ')}</span></li>
+          <li><span><PixelIcon name="fire" /> 연속 학습 {streak.count}일{streak.studiedToday ? ' ✓' : ''}</span><span>{streak.next ? `${streak.daysToNext}일 뒤 ${itemFor(streak.next.itemId).name}` : '한정품 완성'}</span></li>
         </ul>
         {stage.next && <details className="growth-details more" aria-label="다음 성장 조건">
           <summary>{stage.level === 1 ? '아기' : '성체'}가 되려면 · {[growthProgress.xpRemaining === 0, growthProgress.remainingMs === 0, growthProgress.careDays >= stage.days].filter(Boolean).length}/3 달성</summary>
@@ -633,9 +634,9 @@ export default function App() {
           </ul>
         </details>}
         {!family && <GraduationPanel key={state.pet.characterId} pet={state.pet} now={now} pending={pending || accountBusy} onGraduate={graduateTo} />}
-        <details className="more" open={onVacation || undefined}><summary>☀ 휴가{onVacation ? ' 중' : ''}</summary>
+        <details className="more" open={onVacation || undefined}><summary><PixelIcon name="sun" /> 휴가{onVacation ? ' 중' : ''}</summary>
         <section className={`vacation-panel${onVacation ? ' on-vacation' : ''}`} aria-label="휴가 모드">
-          <p id="vacation-note">{onVacation ? '☀ 휴가 중이에요. 문제와 돌봄은 휴가를 마친 뒤 이어가요.' : '오래 비울 때는 휴가를 켜 두세요.'}</p>
+          <p id="vacation-note">{onVacation ? iconText('☀ 휴가 중이에요. 문제와 돌봄은 휴가를 마친 뒤 이어가요.') : '오래 비울 때는 휴가를 켜 두세요.'}</p>
           <button disabled={pending} aria-pressed={onVacation} onClick={() => performUpdate(
             options => updateStored(state,(current,time) => setVacation(current,!onVacation,time),options),
             onVacation ? '휴가를 마쳤어요. 남아 있던 시간부터 다시 함께해요.' : '휴가를 시작했어요. 편안히 다녀오세요!',
@@ -643,7 +644,7 @@ export default function App() {
           )}>{onVacation ? '휴가 마치기' : '휴가 시작하기'}</button>
         </section>
         </details>
-        <details className="more"><summary>🎀 꾸미기 · 앨범</summary>
+        <details className="more"><summary><PixelIcon name="ribbon" /> 꾸미기 · 앨범</summary>
         {family && <div className="member-picker" role="group" aria-label="꾸미기와 앨범을 볼 친구">
           {members.map((member, index) => <button key={member.characterId} aria-pressed={index === shopIndex} onClick={() => setMemberIndex(index)}>{member.petName}</button>)}
         </div>}
@@ -652,7 +653,7 @@ export default function App() {
         </details>
         <RestingGraduates pet={state.pet} />
       </section>}
-      {notice && <p role="status" className="notice">{notice}</p>}
+      {notice && <p role="status" className="notice">{iconText(notice)}</p>}
     </main>
     </div>
     <footer>{account.user ? <>{account.user.username} 계정과 이 브라우저에 자동 저장돼요<br /></> : <>이 브라우저에 자동 저장돼요{account.status === 'off' ? '' : ' · 로그인하면 다른 기기에서도 이어서 키워요'}<br /></>}<span className="credit">by.meibinlee</span>{started && <><br /><button className="reset" disabled={pending || accountBusy} onClick={reset}>펫 초기화</button></>}</footer>

@@ -1,3 +1,4 @@
+import { PixelIcon, iconText } from './PixelIcon.jsx';
 import { useEffect, useRef, useState } from 'react';
 
 // One source for both the first-run tutorial and the "사용방법" panel.
@@ -60,8 +61,8 @@ export const guideSteps = [
 export function GuideContent({ onTutorial }) {
   return <div className="guide-content">
     {guideSteps.map(step => <details key={step.title} className="guide-topic">
-      <summary><span aria-hidden="true">{step.icon}</span> {step.title}</summary>
-      <ul>{step.items.map(item => <li key={item}>{item}</li>)}</ul>
+      <summary><span aria-hidden="true">{iconText(step.icon)}</span> {step.title}</summary>
+      <ul>{step.items.map(item => <li key={item}>{iconText(item)}</li>)}</ul>
     </details>)}
     {onTutorial && <button className="guide-replay" onClick={onTutorial}>▶ 튜토리얼 다시 보기</button>}
   </div>;
@@ -84,9 +85,9 @@ export function Tutorial({ onClose }) {
   const step = guideSteps[index], last = index === guideSteps.length - 1;
   return <dialog ref={dialog} className="tutorial" aria-labelledby="tutorial-title" onCancel={event => { event.preventDefault(); onClose(); }}>
     <div className="modal-top"><span className="tag">튜토리얼 {index + 1} / {guideSteps.length}</span><button onClick={onClose}>건너뛰기</button></div>
-    <div className="tutorial-icon" aria-hidden="true">{step.icon}</div>
+    <div className="tutorial-icon" aria-hidden="true">{iconText(step.icon)}</div>
     <h2 id="tutorial-title">{step.title}</h2>
-    <ul>{step.items.map(item => <li key={item}>{item}</li>)}</ul>
+    <ul>{step.items.map(item => <li key={item}>{iconText(item)}</li>)}</ul>
     <div className="tutorial-dots" aria-hidden="true">{guideSteps.map((_, i) => <span key={i} className={i === index ? 'on' : ''} />)}</div>
     <div className="modal-actions">
       <button disabled={index === 0} onClick={() => setIndex(index - 1)}>← 이전</button>

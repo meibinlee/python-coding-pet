@@ -1,3 +1,4 @@
+import { PixelIcon, iconText } from './PixelIcon.jsx';
 import { useEffect, useRef, useState } from 'react';
 import { credentialError, PASSWORD_MIN } from '../game/account.js';
 
@@ -7,7 +8,7 @@ function PasswordField({ id, label, value, onChange, autoComplete }) {
     <label htmlFor={id}>{label}</label>
     <div className="account-password">
       <input id={id} type={visible ? 'text' : 'password'} value={value} onChange={event => onChange(event.target.value)} autoComplete={autoComplete} autoCapitalize="none" spellCheck="false" minLength={PASSWORD_MIN} maxLength={72} required />
-      <button type="button" onClick={() => setVisible(!visible)} aria-pressed={visible} aria-controls={id} aria-label={visible ? `${label} 숨기기` : `${label} 보기`}>{visible ? '🙈' : '👁'}</button>
+      <button type="button" onClick={() => setVisible(!visible)} aria-pressed={visible} aria-controls={id} aria-label={visible ? `${label} 숨기기` : `${label} 보기`}><PixelIcon name={visible ? 'eyeOff' : 'eye'} size="22px" /></button>
     </div>
   </>;
 }
@@ -92,7 +93,7 @@ export function AccountButton(props) {
   return <>
     <button className={`account-open ${user ? 'signed-in' : 'guest'}`} disabled={checking} onClick={() => setOpen(true)}
       aria-haspopup="dialog" aria-label={user ? `${user.username} 계정 (로그인됨)` : '로그인 또는 회원가입'} title={user ? '내 계정' : '로그인 · 회원가입'}>
-      <span aria-hidden="true">{user ? '✓' : '👤'}</span><span className="account-open-label">{label}</span>
+      <span aria-hidden="true">{user ? '✓' : <PixelIcon name="user" size="1.1em" />}</span><span className="account-open-label">{label}</span>
     </button>
     <dialog ref={dialog} className="account-dialog" aria-labelledby="account-dialog-title" onCancel={event => { event.preventDefault(); setOpen(false); }}
       onClick={event => { if (event.target === dialog.current) setOpen(false); }}>
