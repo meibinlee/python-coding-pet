@@ -10,6 +10,7 @@ import { isOnVacation, resumeVacation } from './vacation.js';
 import { currentDaily, koreanDate } from './time.js';
 import { loadPet, savePet } from './storage.js';
 import { recordChallenge, dueChallenge } from './quest.js';
+import { recordSolve } from './activity.js';
 export const DAILY_LIMIT = 10;
 
 export function submitDaily(state, answer, now = Date.now()) {
@@ -39,7 +40,8 @@ export function submitDaily(state, answer, now = Date.now()) {
     },
   };
   const cared = !fed ? pet : quiz.action === 'hunger' ? recordMeal(pet,now) : startMood(pet,quiz.action === 'cleanliness' ? 'clean' : 'play',now);
-  const maintained = correct ? recordStudyDay(recordMaintenance(cared,quiz.action,now),now) : cared;
+  const studied = correct ? recordStudyDay(recordMaintenance(cared,quiz.action,now),now) : cared;
+  const maintained = correct ? {...studied,activity:recordSolve(studied.activity,now)} : studied;
   const grown = advanceGrowth(refreshHealth(maintained,now),now,correct);
   const current = recordChallenge(applyRoomCare(startNap(state.pet,grown,quiz.action,fed,now),quiz.action,fed),quiz.question,correct,now);
   // In a family, one answer cares for everyone (each keeps its own XP and status).

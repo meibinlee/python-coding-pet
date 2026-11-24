@@ -6,6 +6,7 @@ import CharacterSelector from './components/CharacterSelector.jsx';
 import GrowthAlbum from './components/GrowthAlbum.jsx';
 import Shop from './components/Shop.jsx';
 import { GuideDialog, Tutorial } from './components/Guide.jsx';
+import { Ranking } from './components/Ranking.jsx';
 import { isFull, fullRemaining, activeMood } from './game/meal.js';
 import { trashCount, SICK_CAUSES } from './game/needs.js';
 import { AccountButton } from './components/AccountPanel.jsx';
@@ -655,6 +656,7 @@ export default function App() {
       </section>}
       {notice && <p role="status" className="notice">{iconText(notice)}</p>}
     </main>
+    {cloudConfigured() && <Ranking username={account.user?.username ?? null} />}
     </div>
     <footer>{account.user ? <>{account.user.username} 계정과 이 브라우저에 자동 저장돼요<br /></> : <>이 브라우저에 자동 저장돼요{account.status === 'off' ? '' : ' · 로그인하면 다른 기기에서도 이어서 키워요'}<br /></>}<span className="credit">by.meibinlee</span>{started && <><br /><button className="reset" disabled={pending || accountBusy} onClick={reset}>펫 초기화</button></>}</footer>
     {state.quiz && <QuizModal quiz={state.quiz} pending={pending} limitReached={daily.count >= DAILY_LIMIT && (state.quiz.answered || !state.quiz.question.challenge) && !challengeDue} resetLabel={nextResetLabel(now)} sleepBlocked={resting(state.quiz.action,now)} restMessage={feedRest} vacationBlocked={onVacation} family={family}

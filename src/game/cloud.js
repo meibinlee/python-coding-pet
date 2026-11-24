@@ -61,3 +61,15 @@ export async function deleteCloudSave(userId) {
   const { error } = await (await client()).from(TABLE).delete().eq('user_id', userId);
   if (error) fail(error);
 }
+
+// Top 5 from public.pet_ranking() (supabase/schema.sql): login ID and pet name only.
+export async function fetchRanking() {
+  const { data, error } = await (await client()).rpc('pet_ranking');
+  if (error) fail(error);
+  return toRanking(data);
+}
+
+export const toRanking = rows => (Array.isArray(rows) ? rows : [])
+  .filter(row => row && typeof row.username === 'string' && typeof row.pet_name === 'string')
+  .slice(0, 5)
+  .map((row, index) => ({ rank: Number.isInteger(row.rank) ? row.rank : index + 1, username: row.username, petName: row.pet_name }));
