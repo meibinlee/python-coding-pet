@@ -117,3 +117,21 @@ footer{color:var(--ink-soft)}footer .reset{box-shadow:none;background:transparen
 .room-trash .pixel-icon,.room-mess .pixel-icon{width:1em;height:1em}
 .bubble{z-index:3}
 summary .pixel-icon,.pill .pixel-icon,.today-list .pixel-icon{margin-right:.2em}
+
+/* Ranking (2026-11-24): beside the pet on wide screens, below everything else on phones. */
+.ranking{margin:24px var(--px) 8px;padding:16px;background:var(--card);box-shadow:var(--notch),9px 9px 0 0 #3d25201f}
+.ranking h2{display:flex;align-items:center;gap:8px;font-size:15px;margin:0 0 12px}
+.ranking-list{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.ranking-list li{display:flex;align-items:center;gap:12px;min-height:48px;padding:6px 10px;background:var(--soft);box-shadow:var(--notch)}
+.ranking-list li.mine{background:var(--mint);box-shadow:var(--picked)}
+.ranking-rank{display:grid;place-items:center;flex-shrink:0;width:30px;height:30px;font-weight:700;background:#fff;box-shadow:var(--notch)}
+.ranking-rank.r1{background:var(--butter)}.ranking-rank.r2{background:var(--sky)}.ranking-rank.r3{background:var(--pink)}
+.ranking-who{display:grid;gap:2px;min-width:0}
+.ranking-who strong,.ranking-who small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ranking-who strong{font-size:14px}.ranking-who small{font-size:11px;color:var(--muted)}
+.ranking-note{font-size:11px;line-height:1.6;color:var(--muted);margin:12px 0 0}
+@media(min-width:960px){
+  header{max-width:900px}
+  .layout{max-width:900px;display:grid;grid-template-columns:minmax(0,560px) minmax(0,1fr);gap:28px;align-items:start}
+  .ranking{position:sticky;top:16px;margin:4px var(--px) 0}
+}

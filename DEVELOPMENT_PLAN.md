@@ -8,7 +8,8 @@
 
 - React + Vite + JavaScript + CSS, localStorage, GitHub Pages 정적 SPA.
 - 선택 기능: Supabase Auth + `pet_saves` 테이블로 로그인·계정 저장(2026-10-26 승인). 환경변수가 없으면 로그인 없이 기존과 같이 동작한다.
-- 그 밖의 DB·백엔드·외부 API·친구·랭킹·추적·코드 실행기 없음. React Router 미사용.
+- 순위표(2026-11-24 사용자 요청): `pet_saves`를 읽는 Supabase 함수 `public.pet_ranking()`으로 상위 5명의 아이디·펫 이름만 공개. 점수 = 키운 펫 수×50 + 현재 연속 학습일×5 + 최근 7일 정답 수. PC는 오른쪽, 모바일은 맨 아래.
+- 그 밖의 DB·백엔드·외부 API·친구·추적·코드 실행기 없음. React Router 미사용.
 - 제품명은 사용자 요청에 따라 `파이썬 타마고치`, 새 펫의 기본 이름은 `파이썬`. 학습 안내는 코딩/텍스트 기반 프로그래밍으로 표현한다. 기존 저장 이름은 보존한다.
 - 치이카와·하치와레·우사기 중 처음 한 번 선택한다. 기존 기록은 초기화하지 않고 선택만 추가한다.
 - 사용자 제공 256px 픽셀 PNG를 사용한다(2026-11-09 교체). 자체 SVG 3개는 잘못된 캐릭터 경로의 대체 이미지로 유지한다.
@@ -206,4 +207,4 @@
 
 GitHub Actions CI는 main 푸시와 PR에서 테스트·빌드한다. Pages 배포는 `workflow_dispatch` 수동 실행이며 사용자 요청 시 진행한다. Vite 기본 base는 `./`, 필요 시 `VITE_BASE_PATH=/python-coding-pet/`. 로그인을 켜려면 Actions 변수 `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`(선택 `VITE_LOGIN_EMAIL_DOMAIN`)를 설정한다. 배포 결과·공개 파일 반영을 확인한 뒤 배포 완료로 보고한다.
 
-친구·랭킹·결제·추가 문제 템플릿·이메일 수집은 현재 범위에 포함하지 않는다.
+친구·결제·추가 문제 템플릿·이메일 수집은 현재 범위에 포함하지 않는다. 순위표는 상위 5명의 아이디·펫 이름 표시까지만 한다.
